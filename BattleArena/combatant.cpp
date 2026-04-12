@@ -1,6 +1,7 @@
 #include <algorithm>
 #include "combatant.h"
 #include "random.h"
+#include "worldstate.h"
 
 Combatant::Combatant(const std::string& name, int hitPoints, int strength, int accuracy, 
                     int agility, int defense, const Position& position, 
@@ -26,14 +27,23 @@ int Combatant::calculateHitChance(const Combatant& target) const {
 }
 
 bool Combatant::attackHits(const Combatant& target) const {
-    return false;
+    int chance = calculateHitChance(target);
+    int roll = Random::getUniformInt(1, 100);
+    return roll <= chance;
 }
 
 int Combatant::calculateDamage(const Combatant& target) const {
-    int rawDamage = strength + (rand() % 6);
+    int rawDamage = strength + Random::getUniformInt(0, 5);
     int reducedDamage = rawDamage - target.defense;
-    if (reducedDamage < 1) reducedDamage = 1;
-    return reducedDamage;
+    return std::max(1, reducedDamage);
+}
+
+bool Combatant::tryMoveTo(const Position& desiredPosition, const WorldState& world) {
+    if (!world.isInBounds(desiredPosition)) return false;
+    if (world.isOccupied(desiredPosition)) return false;
+
+    position = desiredPosition;
+    return true;
 }
 
 const std::string& Combatant::getName() const {

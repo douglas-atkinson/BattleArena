@@ -124,13 +124,25 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="attackresult.h" />
     <ClInclude Include="combatant.h" />
+    <ClInclude Include="dummymonster.h" />
+    <ClInclude Include="hero.h" />
+    <ClInclude Include="herotitle.h" />
+    <ClInclude Include="monster.h" />
     <ClInclude Include="position.h" />
     <ClInclude Include="random.h" />
+    <ClInclude Include="worldstate.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="combatant.cpp" />
+    <ClCompile Include="dummymonster.cpp" />
+    <ClCompile Include="hero.cpp" />
+    <ClCompile Include="herotitle.cpp" />
+    <ClCompile Include="monster.cpp" />
     <ClCompile Include="random.cpp" />
+    <ClCompile Include="testdriver.cpp" />
+    <ClCompile Include="worldstate.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

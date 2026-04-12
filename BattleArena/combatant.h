@@ -3,6 +3,8 @@
 #include <string>
 #include <array>
 #include "position.h"
+#include "attackresult.h"
+#include "worldstate.h"
 
 class Combatant {
 public:
@@ -18,15 +20,16 @@ public:
 
     virtual ~Combatant() = default;
 
-    virtual void move(int arenaRows, int arenaCols) = 0;
-    virtual void attack(Combatant& target) = 0;
-    virtual void speak() const = 0;
+    virtual AttackResult attack(Combatant& target) = 0;
+    virtual std::string speak() const = 0;
 
     virtual bool isAlive() const;
     virtual void takeDamage(int amount);
     virtual int calculateHitChance(const Combatant& target) const;
     virtual bool attackHits(const Combatant& target) const;
     virtual int calculateDamage(const Combatant& target) const;
+
+    virtual bool tryMoveTo(const Position& desiredPosition, const WorldState& world);
 
     const std::string& getName() const;
     int getHitPoints() const;
@@ -41,15 +44,14 @@ public:
     const std::array<std::string, 6>& getPortrait() const;
 
 protected:
-	std::string name;
-	int hitPoints;
-	int maxHitPoints;
-	int strength;
-	int accuracy;
-	int agility;
-	int defense;
-	Position position;
-	std::array<std::string, 6> portrait;
-	char symbol;
-
+    std::string name;
+    int hitPoints;
+    int maxHitPoints;
+    int strength;
+    int accuracy;
+    int agility;
+    int defense;
+    Position position;
+    std::array<std::string, 6> portrait;
+    char symbol;
 };
