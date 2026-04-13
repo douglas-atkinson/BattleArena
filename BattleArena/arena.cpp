@@ -83,7 +83,17 @@ void Arena::processHeroTurn() {
     std::cout << "Enter movement command (W/A/S/D/R): ";
     std::cin >> command;
 
-    hero.moveByPlayerCommand(command, world);
+    MovementResult result = hero.moveByPlayerCommand(command, world);
+    switch (result) {
+    case MovementResult::Success:
+        break;
+    case MovementResult::InvalidCommand:
+        std::cout << "Invalid input. Use W, A, S, D, or R.\n";
+        break;
+    case MovementResult::Blocked:
+        std::cout << "You cannot move there.\n";
+        break;
+    }
 
     Monster* target = findAdjacentMonsterToHero();
     if (target != nullptr && hero.isAlive() && target->isAlive()) {
@@ -192,4 +202,24 @@ void Arena::assignSymbols() {
             monster->setSymbol('?'); // fallback
         }
     }
+}
+
+void Arena::validateStartState() const
+{
+}
+
+void Arena::validateArenaDimensions() const
+{
+}
+
+void Arena::validateHeroPosition() const
+{
+}
+
+void Arena::validateMonsterPositions() const
+{
+}
+
+void Arena::validateNoOverlappingCombatants() const
+{
 }

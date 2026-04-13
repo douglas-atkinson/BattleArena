@@ -36,4 +36,10 @@ private:
     void printBattleState() const;
 
     void assignSymbols();
+
+    void validateStartState() const;
+    void validateArenaDimensions() const;
+    void validateHeroPosition() const;
+    void validateMonsterPositions() const;
+    void validateNoOverlappingCombatants() const;
 };
