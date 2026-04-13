@@ -1,15 +1,16 @@
 #include <algorithm>
+#include <cmath>
 #include "combatant.h"
 #include "random.h"
 #include "worldstate.h"
 
 Combatant::Combatant(const std::string& name, int hitPoints, int strength, int accuracy, 
                     int agility, int defense, const Position& position, 
-                    const std::array<std::string, 6>& portrait, char symbol)
+                    const std::array<std::string, 6>& portrait)
     : name(name), hitPoints(std::max(1, hitPoints)), maxHitPoints(std::max(1, hitPoints)), 
       strength(std::max(1, strength)), accuracy(std::max(1, accuracy)), agility(std::max(1, agility)),
       defense(std::max(1, defense)), position(position),
-      portrait(portrait), symbol(symbol) { }
+      portrait(portrait) { }
 
 
 bool Combatant::isAlive() const {
@@ -39,6 +40,7 @@ int Combatant::calculateDamage(const Combatant& target) const {
 }
 
 bool Combatant::tryMoveTo(const Position& desiredPosition, const WorldState& world) {
+    if (desiredPosition == position) return true;
     if (!world.isInBounds(desiredPosition)) return false;
     if (world.isOccupied(desiredPosition)) return false;
 
@@ -86,6 +88,33 @@ void Combatant::setPosition(const Position& newPosition) {
     position = newPosition;
 }
 
+void Combatant::setSymbol(const char symbol) {
+    this->symbol = symbol;
+}
+
 const std::array<std::string, 6>& Combatant::getPortrait() const {
     return portrait;
+}
+
+AttackResult Combatant::performBasicAttack(Combatant& target) {
+    AttackResult result;
+
+    if (!isAlive()) return result;
+    if (!target.isAlive()) return result;
+    if (&target == this) return result;
+
+    if (attackHits(target)) {
+        result.hit = true;
+        result.damage = calculateDamage(target);
+        target.takeDamage(result.damage);
+        result.targetDefeated = !target.isAlive();
+    }
+
+    return result;
+}
+
+bool Combatant::isOrthogonallyAdjacent(const Combatant& other) const {
+    int dr = std::abs(position.row - other.position.row);
+    int dc = std::abs(position.col - other.position.col);
+    return (dr + dc == 1);
 }

@@ -12,8 +12,7 @@ public:
         int agility,
         int defense,
         const Position& position,
-        const std::array<std::string, 6>& portrait,
-        char symbol);
+        const std::array<std::string, 6>& portrait);
 
     virtual bool move(const WorldState& world) = 0;
     std::string speak() const override;

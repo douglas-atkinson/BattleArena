@@ -15,8 +15,7 @@ public:
         int agility,
         int defense,
         const Position& position,
-        const std::array<std::string, 6>& portrait,
-        char symbol);
+        const std::array<std::string, 6>& portrait);
 
     virtual ~Combatant() = default;
 
@@ -41,6 +40,7 @@ public:
     char getSymbol() const;
     const Position& getPosition() const;
     void setPosition(const Position& newPosition);
+    void setSymbol(const char symbol);
     const std::array<std::string, 6>& getPortrait() const;
 
 protected:
@@ -53,5 +53,8 @@ protected:
     int defense;
     Position position;
     std::array<std::string, 6> portrait;
-    char symbol;
+    char symbol = '?';
+
+    AttackResult performBasicAttack(Combatant& target);
+    bool isOrthogonallyAdjacent(const Combatant& other) const;
 };

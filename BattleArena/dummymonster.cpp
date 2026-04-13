@@ -5,26 +5,18 @@
 #include "random.h"
 
 DummyMonster::DummyMonster(const std::string& name, int hitPoints, int strength, int accuracy, int agility, 
-    int defense, const Position& position, const std::array<std::string, 6>& portrait, char symbol)
-    : Monster(name, hitPoints, strength, accuracy, agility, defense, position, portrait, symbol) {}
+    int defense, const Position& position, const std::array<std::string, 6>& portrait)
+    : Monster(name, hitPoints, strength, accuracy, agility, defense, position, portrait) {}
 
 AttackResult DummyMonster::attack(Combatant& target) {
-    AttackResult result;
-    if (attackHits(target)) {
-        result.hit = true;
-        result.damage = calculateDamage(target);
-        target.takeDamage(result.damage);
-        if (target.getHitPoints() <= 0) {
-            result.targetDefeated = true;
-        }
-    }
-    return result;
+    return performBasicAttack(target);
 }
 
 bool DummyMonster::move(const WorldState& world) {
     Position heroPos = world.heroPosition;
     Position newPos = position;
-    if (Random::getUniformInt(0, 100) < 50) {
+    int moveDecision = Random::getUniformInt(0, 2);
+    if (moveDecision == 0) {
         // Move closer to player by row
         if (newPos.row < heroPos.row) {
             newPos.row++;
@@ -33,7 +25,7 @@ bool DummyMonster::move(const WorldState& world) {
             newPos.row--;
         }
     }
-    else {
+    else if (moveDecision == 1) {
         // Move closer to player by col
         if (newPos.col < heroPos.col) {
             newPos.col++;
@@ -42,8 +34,10 @@ bool DummyMonster::move(const WorldState& world) {
             newPos.col--;
         }
     }
+    else {
+        return true;  // stays in place
+    }
     if (tryMoveTo(newPos, world)) {
-        position = newPos;
         return true;
     }
 

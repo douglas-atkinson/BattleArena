@@ -3,6 +3,7 @@
 #include "combatant.h"
 #include "herotitle.h"
 #include "worldstate.h"
+#include "movementresult.h"
 
 class Hero : public Combatant {
 public:
@@ -14,10 +15,9 @@ public:
         int agility,
         int defense,
         const Position& position,
-        const std::array<std::string, 6>& portrait,
-        char symbol);
+        const std::array<std::string, 6>& portrait);
 
-    bool moveByPlayerCommand(char command, const WorldState& world);
+    MovementResult moveByPlayerCommand(char command, const WorldState& world);
     AttackResult attack(Combatant& target) override;
     std::string speak() const override;
 

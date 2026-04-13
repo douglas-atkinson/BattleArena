@@ -3,39 +3,36 @@
 #include "attackresult.h"
 #include "herotitle.h"
 #include "position.h"
+#include "movementresult.h"
 #include <cctype>
 
 Hero::Hero(const std::string& name, HeroTitle title, int hitPoints, int strength, int accuracy, 
-           int agility, int defense, const Position& position, const std::array<std::string, 6>& portrait, 
-           char symbol)
-    : Combatant(name, hitPoints, strength, accuracy, agility, defense, position, portrait, symbol),
+           int agility, int defense, const Position& position, 
+           const std::array<std::string, 6>& portrait)
+    : Combatant(name, hitPoints, strength, accuracy, agility, defense, position, portrait),
     title(title), level(1), victories(0) {}
 
-bool Hero::moveByPlayerCommand(char command, const WorldState& world) {
+MovementResult Hero::moveByPlayerCommand(char command, const WorldState& world) {
     Position newPos = position;
-    command = tolower(command);
-    if (command == 'w') newPos.row--;   // Move north
-    if (command == 'a') newPos.col--;   // Move west
-    if (command == 's') newPos.row++;   // Move south
-    if (command == 'd') newPos.col++;   // Move east
-    if (tryMoveTo(newPos, world)) {
-        position = newPos;
-        return true;
+    command = static_cast<char>(std::tolower(static_cast<unsigned char>(command)));
+    switch (command) {
+    case 'w': newPos.row -= 1; break;   // north
+    case 'a': newPos.col -= 1; break;   // west
+    case 's': newPos.row += 1; break;   // south
+    case 'd': newPos.col += 1; break;   // east
+    case 'r': return MovementResult::Success;   // explicit rest
+    default:
+        return MovementResult::InvalidCommand;
     }
-    return false;
+
+    if (tryMoveTo(newPos, world)) {
+        return MovementResult::Success;
+    }
+    return MovementResult::Blocked;
 }
 
 AttackResult Hero::attack(Combatant& target) {
-    AttackResult result;
-    if (attackHits(target)) {
-        result.hit = true;
-        result.damage = calculateDamage(target);
-        target.takeDamage(result.damage);
-        if (target.getHitPoints() <= 0) {
-            result.targetDefeated = true;
-        }
-    }
-    return result;
+    return performBasicAttack(target);
 }
 
 std::string Hero::speak() const {
@@ -64,7 +61,10 @@ void Hero::recordVictory() {
     if (victories % 3 == 0) {
         ++level;
         if (level % 2 == 0) {
-            maxHitPoints *= 1.2;
+            // This is intentional
+            // maxHitPoints will increase about 20% give or take a truncated fraction
+            // hitPoints is not updated until a new Battle Arena round starts
+            maxHitPoints = maxHitPoints * 6 / 5;
         }
     }
 }

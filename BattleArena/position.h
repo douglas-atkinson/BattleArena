@@ -7,11 +7,6 @@ struct Position {
 	Position() : row(0), col(0) {}
 	Position(int row, int col) : row(row), col(col) {}
 
-	friend bool operator==(Position rhs, Position lhs) {
-		return rhs.row == lhs.row && rhs.col == lhs.col;
-	}
+	bool operator==(const Position&) const = default;
 
-	friend bool operator!=(Position rhs, Position lhs) {
-		return !(rhs == lhs);
-	}
 };
