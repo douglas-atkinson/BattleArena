@@ -26,7 +26,7 @@ private:
     bool isBattleOver() const;
     bool heroWon() const;
 
-    void processHeroTurn();
+    bool processHeroTurn();
     void processMonsterTurn(Monster& monster);
 
     Monster* findAdjacentMonsterToHero();

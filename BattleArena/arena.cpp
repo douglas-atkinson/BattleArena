@@ -23,7 +23,10 @@ void Arena::runBattle() {
         if (hero.isAlive()) {
 			displayBattleFieldLegend();
 			displayBattleField();
-            processHeroTurn();
+            if (!processHeroTurn()) {
+                std::cout << "\nInput ended. Battle abandoned.\n";
+                return;
+            }
 			displayBattleFieldLegend();
 			displayBattleField();
         }
@@ -85,23 +88,28 @@ bool Arena::heroWon() const {
     return hero.isAlive() && monsters.empty();
 }
 
-void Arena::processHeroTurn() {
+// Returns false if input ended before the hero could take a turn.
+bool Arena::processHeroTurn() {
     WorldState world = buildWorldStateForHero();
 
     std::string command;
-    std::cout << "Enter movement command (W/A/S/D/R): ";
-    std::getline(std::cin, command);
+    MovementResult result = MovementResult::InvalidCommand;
 
-    MovementResult result = hero.moveByPlayerCommand(command, world);
-    switch (result) {
-    case MovementResult::Success:
-        break;
-    case MovementResult::InvalidCommand:
-        std::cout << "Invalid input. Use W, A, S, D, or R.\n";
-        break;
-    case MovementResult::Blocked:
+    while (result == MovementResult::InvalidCommand) {
+        std::cout << "Enter movement command (W/A/S/D/R): ";
+        if (!std::getline(std::cin, command)) {
+            return false;
+        }
+
+        result = hero.moveByPlayerCommand(command, world);
+        if (result == MovementResult::InvalidCommand) {
+            std::cout << "Invalid input. Enter R to rest, or W/A/S/D moves (maximum "
+                << hero.getSpeed() << ").\n";
+        }
+    }
+
+    if (result == MovementResult::Blocked) {
         std::cout << "You cannot move there.\n";
-        break;
     }
 
     Monster* target = findAdjacentMonsterToHero();
@@ -118,6 +126,8 @@ void Arena::processHeroTurn() {
             hero.recordVictory();
         }
     }
+
+    return true;
 }
 
 void Arena::processMonsterTurn(Monster& monster) {
