@@ -17,4 +17,9 @@ public:
 
     virtual bool move(const WorldState& world) = 0;
     std::string speak() const override;
+
+protected:
+    // Single-step movement helpers. Each returns true if the monster moved one square.
+    bool stepTowardHero(const WorldState& world);
+    bool stepAwayFromHero(const WorldState& world);
 };

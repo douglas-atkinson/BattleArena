@@ -5,7 +5,7 @@
 
 #include "arena.h"
 #include "hero.h"
-//#include "goblin.h"
+#include "goblin.h"
 //#include "ogre.h"
 #include "dummymonster.h"
 #include "herotitle.h"
@@ -17,7 +17,7 @@ int main() {
 
     std::vector<std::unique_ptr<Monster>> monsters;
 
-    monsters.push_back(std::make_unique<DummyMonster>("Grub", 8, 4, 2, 1, 2, 2, Position{ 5, 2 }, portrait));
+    monsters.push_back(std::make_unique<Goblin>("Grub", 24, 4, 2, 1, 4, 2, Position{ 5, 2 }, portrait));
 
     monsters.push_back(std::make_unique<DummyMonster>("Brak", 14, 6, 2, 3, 4, 3, Position{ 7, 4 }, portrait));
 

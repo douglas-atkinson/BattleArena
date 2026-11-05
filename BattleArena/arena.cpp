@@ -203,7 +203,7 @@ void Arena::assignSymbols() {
         'G', 'H', 'I', 'J', 'K', 'L'
     };
 
-    int index = 0;
+    std::size_t index = 0;
 
     hero.setSymbol(pool[index++]);
 

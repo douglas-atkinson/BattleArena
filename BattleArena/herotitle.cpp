@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cctype>
 #include <stdexcept>
 #include "herotitle.h"
 
