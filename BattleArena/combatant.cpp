@@ -5,11 +5,11 @@
 #include "worldstate.h"
 
 Combatant::Combatant(const std::string& name, int hitPoints, int strength, int accuracy, 
-                    int agility, int defense, const Position& position, 
+                    int agility, int defense, int speed, const Position& position,
                     const std::array<std::string, 6>& portrait)
     : name(name), hitPoints(std::max(1, hitPoints)), maxHitPoints(std::max(1, hitPoints)), 
       strength(std::max(1, strength)), accuracy(std::max(1, accuracy)), agility(std::max(1, agility)),
-      defense(std::max(1, defense)), position(position),
+      defense(std::max(1, defense)), speed(std::max(1, speed)), position(position),
       portrait(portrait) { }
 
 
@@ -76,6 +76,10 @@ int Combatant::getDefense() const {
     return defense;
 }
 
+int Combatant::getSpeed() const {
+    return speed;
+}
+
 char Combatant::getSymbol() const {
     return symbol;
 }
@@ -111,10 +115,4 @@ AttackResult Combatant::performBasicAttack(Combatant& target) {
     }
 
     return result;
-}
-
-bool Combatant::isOrthogonallyAdjacent(const Combatant& other) const {
-    int dr = std::abs(position.row - other.position.row);
-    int dc = std::abs(position.col - other.position.col);
-    return (dr + dc == 1);
 }

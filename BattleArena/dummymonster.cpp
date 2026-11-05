@@ -5,8 +5,8 @@
 #include "random.h"
 
 DummyMonster::DummyMonster(const std::string& name, int hitPoints, int strength, int accuracy, int agility, 
-    int defense, const Position& position, const std::array<std::string, 6>& portrait)
-    : Monster(name, hitPoints, strength, accuracy, agility, defense, position, portrait) {}
+    int defense, int speed, const Position& position, const std::array<std::string, 6>& portrait)
+    : Monster(name, hitPoints, strength, accuracy, agility, defense, speed, position, portrait) {}
 
 AttackResult DummyMonster::attack(Combatant& target) {
     return performBasicAttack(target);
@@ -42,4 +42,8 @@ bool DummyMonster::move(const WorldState& world) {
     }
 
     return false;
+}
+
+std::string DummyMonster::speak() const {
+	return "I'm not a dummy";
 }

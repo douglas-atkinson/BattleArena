@@ -11,6 +11,7 @@ public:
         int accuracy,
         int agility,
         int defense,
+        int speed,
         const Position& position,
         const std::array<std::string, 6>& portrait);
 

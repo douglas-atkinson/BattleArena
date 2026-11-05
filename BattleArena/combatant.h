@@ -14,6 +14,7 @@ public:
         int accuracy,
         int agility,
         int defense,
+        int speed,
         const Position& position,
         const std::array<std::string, 6>& portrait);
 
@@ -37,6 +38,7 @@ public:
     int getAccuracy() const;
     int getAgility() const;
     int getDefense() const;
+	int getSpeed() const;
     char getSymbol() const;
     const Position& getPosition() const;
     void setPosition(const Position& newPosition);
@@ -51,10 +53,10 @@ protected:
     int accuracy;
     int agility;
     int defense;
+	int speed;
     Position position;
     std::array<std::string, 6> portrait;
     char symbol = '?';
 
     AttackResult performBasicAttack(Combatant& target);
-    bool isOrthogonallyAdjacent(const Combatant& other) const;
 };

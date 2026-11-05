@@ -14,10 +14,11 @@ public:
         int accuracy,
         int agility,
         int defense,
+        int speed,
         const Position& position,
         const std::array<std::string, 6>& portrait);
 
-    MovementResult moveByPlayerCommand(char command, const WorldState& world);
+    MovementResult moveByPlayerCommand(const std::string& commands, const WorldState& world);
     AttackResult attack(Combatant& target) override;
     std::string speak() const override;
 

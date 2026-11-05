@@ -30,7 +30,6 @@ private:
     void processMonsterTurn(Monster& monster);
 
     Monster* findAdjacentMonsterToHero();
-    bool areOrthogonallyAdjacent(const Combatant& a, const Combatant& b) const;
 
     void removeDeadMonsters();
     void printBattleState() const;
@@ -40,6 +39,11 @@ private:
     void validateStartState() const;
     void validateArenaDimensions() const;
     void validateHeroPosition() const;
+    void validateNoNullMonsters() const;
     void validateMonsterPositions() const;
     void validateNoOverlappingCombatants() const;
+    bool inBounds(int row, int col) const;
+
+	void displayBattleField() const;
+	void displayBattleFieldLegend() const;
 };

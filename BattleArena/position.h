@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdlib>
+
 struct Position {
 	int row;
 	int col;
@@ -10,3 +12,13 @@ struct Position {
 	bool operator==(const Position&) const = default;
 
 };
+
+// ---------- Utility Functions ----------
+
+inline int manhattanDistance(const Position& a, const Position& b) {
+	return std::abs(a.row - b.row) + std::abs(a.col - b.col);
+}
+
+inline bool areOrthogonallyAdjacent(const Position& a, const Position& b) {
+	return manhattanDistance(a, b) == 1;
+}

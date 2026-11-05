@@ -2,12 +2,17 @@
 #include <memory>
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
+#include <set>
+#include <utility>
 #include "arena.h"
 #include "hero.h"
 #include "monster.h"
+#include "position.h"
 
 Arena::Arena(Hero hero, std::vector<std::unique_ptr<Monster>> monsters, int rows, int cols)
     : hero(std::move(hero)), monsters(std::move(monsters)), rows(rows), cols(cols) {
+    validateStartState();
     assignSymbols();
 }
 
@@ -16,7 +21,11 @@ void Arena::runBattle() {
         printBattleState();
 
         if (hero.isAlive()) {
+			displayBattleFieldLegend();
+			displayBattleField();
             processHeroTurn();
+			displayBattleFieldLegend();
+			displayBattleField();
         }
 
         removeDeadMonsters();
@@ -79,9 +88,9 @@ bool Arena::heroWon() const {
 void Arena::processHeroTurn() {
     WorldState world = buildWorldStateForHero();
 
-    char command;
+    std::string command;
     std::cout << "Enter movement command (W/A/S/D/R): ";
-    std::cin >> command;
+    std::getline(std::cin, command);
 
     MovementResult result = hero.moveByPlayerCommand(command, world);
     switch (result) {
@@ -117,7 +126,7 @@ void Arena::processMonsterTurn(Monster& monster) {
     WorldState world = buildWorldStateForMonster(&monster);
     monster.move(world);
 
-    if (hero.isAlive() && areOrthogonallyAdjacent(monster, hero)) {
+    if (hero.isAlive() && areOrthogonallyAdjacent(monster.getPosition(), hero.getPosition())) {
         AttackResult result = monster.attack(hero);
 
         std::cout << "\n" << monster.getName() << "'s Attack Result\n";
@@ -131,18 +140,12 @@ void Arena::processMonsterTurn(Monster& monster) {
 Monster* Arena::findAdjacentMonsterToHero() {
     for (auto& monsterPtr : monsters) {
         if (monsterPtr->isAlive() &&
-            areOrthogonallyAdjacent(hero, *monsterPtr)) {
+            areOrthogonallyAdjacent(hero.getPosition(), monsterPtr->getPosition())) {
             return monsterPtr.get();
         }
     }
 
     return nullptr;
-}
-
-bool Arena::areOrthogonallyAdjacent(const Combatant& a, const Combatant& b) const {
-    int dr = std::abs(a.getPosition().row - b.getPosition().row);
-    int dc = std::abs(a.getPosition().col - b.getPosition().col);
-    return (dr + dc == 1);
 }
 
 void Arena::removeDeadMonsters() {
@@ -204,22 +207,94 @@ void Arena::assignSymbols() {
     }
 }
 
-void Arena::validateStartState() const
-{
+void Arena::validateStartState() const {
+    validateArenaDimensions();
+    validateHeroPosition();
+    validateNoNullMonsters();
+    validateMonsterPositions();
+    validateNoOverlappingCombatants();
 }
 
-void Arena::validateArenaDimensions() const
-{
+void Arena::validateArenaDimensions() const {
+    if (rows <= 0 || cols <= 0) {
+        throw std::invalid_argument("Arena dimensions must be greater than 0.");
+    }
 }
 
-void Arena::validateHeroPosition() const
-{
+void Arena::validateHeroPosition() const {
+    const Position pos = hero.getPosition();
+    if (!inBounds(pos.row, pos.col)) {
+        throw std::invalid_argument("Hero's position must be within Arena boundaries");
+    }
 }
 
-void Arena::validateMonsterPositions() const
-{
+void Arena::validateNoNullMonsters() const {
+    for (const auto& monster : monsters) {
+        if (monster == nullptr) {
+            throw std::invalid_argument("Pointer to Monster cannot be null");
+        }
+    }
 }
 
-void Arena::validateNoOverlappingCombatants() const
-{
+void Arena::validateMonsterPositions() const {
+    for (const auto& monster : monsters) {
+        const Position pos = monster->getPosition();
+        if (!inBounds(pos.row, pos.col)) {
+            throw std::invalid_argument("Monster's position must be within Arena boundaries");
+        }
+    }
+
+}
+
+void Arena::validateNoOverlappingCombatants() const {
+    std::set<std::pair<int, int>> occupied;
+
+    const Position heroPos = hero.getPosition();
+    occupied.insert({ heroPos.row, heroPos.col });
+
+    for (const auto& monster : monsters) {
+        const Position pos = monster->getPosition();
+
+        if (!occupied.insert({ pos.row, pos.col }).second) {
+            throw std::invalid_argument("Two combatants cannot occupy the same starting position.");
+        }
+    }
+}
+
+bool Arena::inBounds(int row, int col) const {
+    return (row >= 0 && row < rows && col >= 0 && col < cols);
+}
+
+void Arena::displayBattleField() const {
+    for (int row = 0; row < rows; ++row) {
+        for (int col = 0; col < cols; ++col) {
+
+			Position current{ row, col };
+            char symbol = '.';
+
+            if (hero.getPosition() == current) {
+                symbol = hero.getSymbol();
+            }
+            else {
+                // Check monsters
+                for (const auto& monster : monsters) {
+                    if (monster->isAlive() && monster->getPosition() == current) {
+                        symbol = monster->getSymbol();
+                        break;
+					}
+                }
+            }
+            std::cout << symbol << ' ';
+        }
+        std::cout << '\n';
+	}
+	std::cout << '\n';
+}
+
+void Arena::displayBattleFieldLegend() const {
+    std::cout << hero.getSymbol() << " = Hero\n";
+    for (const auto& monster : monsters) {
+        std::cout << monster->getSymbol() << " = Monster\n";
+    }
+    std::cout << '\n';
 }
