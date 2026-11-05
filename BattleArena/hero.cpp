@@ -46,23 +46,30 @@ MovementResult Hero::moveByPlayerCommand(const std::string& commands, const Worl
         }
 	}
 
-    for (char command : normalized) {
-        Position newPos = position;
+    // Walk the whole path on a local copy so a blocked step leaves the hero where it started.
+    Position pathPos = position;
 
+    for (char command : normalized) {
         switch (command) {
-        case 'w': newPos.row -= 1; break;
-        case 'a': newPos.col -= 1; break;
-        case 's': newPos.row += 1; break;
-        case 'd': newPos.col += 1; break;
+        case 'w': pathPos.row -= 1; break;
+        case 'a': pathPos.col -= 1; break;
+        case 's': pathPos.row += 1; break;
+        case 'd': pathPos.col += 1; break;
         default:
 			return MovementResult::InvalidCommand; // don't really need this since we validated above, but just in case
         }
 
-        if (!tryMoveTo(newPos, world)) {
+        if (!world.isInBounds(pathPos)) {
+            return MovementResult::Blocked;
+        }
+
+        // world.heroPosition is the hero's own starting square, which the path may revisit.
+        if (pathPos != position && world.isOccupied(pathPos)) {
             return MovementResult::Blocked;
         }
     }
 
+    position = pathPos;
     return MovementResult::Success;
 }
 
