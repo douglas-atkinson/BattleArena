@@ -136,6 +136,7 @@
     <ClInclude Include="herotitle.h" />
     <ClInclude Include="monster.h" />
     <ClInclude Include="movementresult.h" />
+    <ClInclude Include="ogre.h" />
     <ClInclude Include="position.h" />
     <ClInclude Include="random.h" />
     <ClInclude Include="worldstate.h" />
@@ -149,6 +150,7 @@
     <ClCompile Include="herotitle.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="monster.cpp" />
+    <ClCompile Include="ogre.cpp" />
     <ClCompile Include="random.cpp" />
     <ClCompile Include="worldstate.cpp" />
   </ItemGroup>

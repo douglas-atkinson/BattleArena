@@ -6,8 +6,7 @@
 #include "arena.h"
 #include "hero.h"
 #include "goblin.h"
-//#include "ogre.h"
-#include "dummymonster.h"
+#include "ogre.h"
 #include "herotitle.h"
 
 int main() {
@@ -19,7 +18,7 @@ int main() {
 
     monsters.push_back(std::make_unique<Goblin>("Grub", 24, 4, 2, 1, 4, 2, Position{ 5, 2 }, portrait));
 
-    monsters.push_back(std::make_unique<DummyMonster>("Brak", 14, 6, 2, 3, 4, 3, Position{ 7, 4 }, portrait));
+    monsters.push_back(std::make_unique<Ogre>("Brak", 40, 20, 8, 2, 8, 1, Position{ 7, 4 }, portrait));
 
     Arena arena(std::move(hero), std::move(monsters), 10, 10);
     arena.runBattle();
