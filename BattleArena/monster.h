@@ -22,4 +22,5 @@ protected:
     // Single-step movement helpers. Each returns true if the monster moved one square.
     bool stepTowardHero(const WorldState& world);
     bool stepAwayFromHero(const WorldState& world);
+    bool stepRandom(const WorldState& world);
 };

@@ -87,3 +87,24 @@ bool Monster::stepAwayFromHero(const WorldState& world) {
 
     return found && tryMoveTo(best, world);
 }
+
+// Moves to one of the open neighboring squares, each equally likely.
+// Returns false if every neighboring square is blocked.
+bool Monster::stepRandom(const WorldState& world) {
+    std::array<Position, 4> openSquares;
+    int openCount = 0;
+
+    for (const Position& square : neighborsOf(position)) {
+        if (isOpen(square, world)) {
+            openSquares[openCount] = square;
+            ++openCount;
+        }
+    }
+
+    if (openCount == 0) {
+        return false;
+    }
+
+    int choice = Random::getUniformInt(0, openCount - 1);
+    return tryMoveTo(openSquares[choice], world);
+}
