@@ -117,6 +117,11 @@ bool Arena::processHeroTurn() {
         AttackResult result = hero.attack(*target);
 
         std::cout << "\nHero Attack Result\n";
+        for (const std::string& message : result.messages) {
+            if (!message.empty()) {
+                std::cout << message << '\n';
+            }
+        }
         std::cout << "Hit: " << (result.hit ? "Yes" : "No") << '\n';
         std::cout << "Damage done: " << result.damage << '\n';
         std::cout << "Opponent defeated: "
@@ -140,6 +145,11 @@ void Arena::processMonsterTurn(Monster& monster) {
         AttackResult result = monster.attack(hero);
 
         std::cout << "\n" << monster.getName() << "'s Attack Result\n";
+        for (const std::string& message : result.messages) {
+            if (!message.empty()) {
+                std::cout << message << '\n';
+            }
+        }
         std::cout << "Hit: " << (result.hit ? "Yes" : "No") << '\n';
         std::cout << "Damage done: " << result.damage << '\n';
         std::cout << "Opponent defeated: "
