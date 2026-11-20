@@ -4,6 +4,7 @@
 #include "herotitle.h"
 #include "position.h"
 #include "movementresult.h"
+#include <algorithm>
 #include <cctype>
 #include <string>
 
@@ -99,6 +100,8 @@ int Hero::getVictories() const {
 }
 
 void Hero::recordVictory() {
+    // Increasing maxHitPoints does not immediately restore HP.
+    // Healing can subsequently recover HP up to the new maximum.
     ++victories;
     if (victories % 3 == 0) {
         ++level;
@@ -109,4 +112,14 @@ void Hero::recordVictory() {
             maxHitPoints = maxHitPoints * 6 / 5;
         }
     }
+}
+
+int Hero::recoverHitPoints(int amount) {
+    if (!isAlive() || amount <= 0) {
+        return 0;
+    }
+
+    int before = hitPoints;
+    hitPoints = std::min(maxHitPoints, hitPoints + amount);
+    return hitPoints - before;
 }

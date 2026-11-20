@@ -29,6 +29,9 @@ public:
 
     void recordVictory();
 
+    // Restores up to amount HP without exceeding the maximum. Returns the HP actually restored.
+    int recoverHitPoints(int amount);
+
 private:
     HeroTitle title;
     int level;

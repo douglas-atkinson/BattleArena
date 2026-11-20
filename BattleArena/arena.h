@@ -26,8 +26,12 @@ private:
     bool isBattleOver() const;
     bool heroWon() const;
 
-    bool processHeroTurn();
-    void processMonsterTurn(Monster& monster);
+    // The healing opportunity the hero's turn earned, if the round stays peaceful.
+    enum class RecoveryChance { None, Moved, Rested };
+
+    bool processHeroTurn(RecoveryChance& recovery);
+    bool processMonsterTurn(Monster& monster);
+    void tryHeroRecovery(RecoveryChance recovery);
 
     Monster* findAdjacentMonsterToHero();
 

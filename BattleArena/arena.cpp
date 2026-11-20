@@ -9,6 +9,19 @@
 #include "hero.h"
 #include "monster.h"
 #include "position.h"
+#include "random.h"
+
+namespace {
+    const int MoveRecoveryChancePercent = 25;   // successful move: 1 HP
+    const int RestRecoveryChancePercent = 65;   // rest: 1-3 HP
+    const int MinRestRecovery = 1;
+    const int MaxRestRecovery = 3;
+
+    // Matches Hero::moveByPlayerCommand(), which treats "r" or "R" as resting.
+    bool isRestCommand(const std::string& command) {
+        return command == "r" || command == "R";
+    }
+}
 
 Arena::Arena(Hero hero, std::vector<std::unique_ptr<Monster>> monsters, int rows, int cols)
     : hero(std::move(hero)), monsters(std::move(monsters)), rows(rows), cols(cols) {
@@ -20,10 +33,12 @@ void Arena::runBattle() {
     while (!isBattleOver()) {
         printBattleState();
 
+        RecoveryChance recovery = RecoveryChance::None;
+
         if (hero.isAlive()) {
 			displayBattleFieldLegend();
 			displayBattleField();
-            if (!processHeroTurn()) {
+            if (!processHeroTurn(recovery)) {
                 std::cout << "\nInput ended. Battle abandoned.\n";
                 return;
             }
@@ -35,12 +50,22 @@ void Arena::runBattle() {
 
         if (isBattleOver()) break;
 
+        bool heroWasAttacked = false;
+
         for (auto& monsterPtr : monsters) {
             if (!monsterPtr->isAlive()) continue;
 
-            processMonsterTurn(*monsterPtr);
+            if (processMonsterTurn(*monsterPtr)) {
+                heroWasAttacked = true;
+            }
 
             if (!hero.isAlive()) break;
+        }
+
+        // Healing happens only in a peaceful round: no monster attacked the hero,
+        // and processHeroTurn() already cleared the chance if the hero attacked.
+        if (!heroWasAttacked) {
+            tryHeroRecovery(recovery);
         }
 
         removeDeadMonsters();
@@ -89,7 +114,10 @@ bool Arena::heroWon() const {
 }
 
 // Returns false if input ended before the hero could take a turn.
-bool Arena::processHeroTurn() {
+// Sets recovery to the healing chance earned: Moved or Rested, or None if the
+// move was blocked or the hero attacked.
+bool Arena::processHeroTurn(RecoveryChance& recovery) {
+    recovery = RecoveryChance::None;
     WorldState world = buildWorldStateForHero();
 
     std::string command;
@@ -111,9 +139,13 @@ bool Arena::processHeroTurn() {
     if (result == MovementResult::Blocked) {
         std::cout << "You cannot move there.\n";
     }
+    else {
+        recovery = isRestCommand(command) ? RecoveryChance::Rested : RecoveryChance::Moved;
+    }
 
     Monster* target = findAdjacentMonsterToHero();
     if (target != nullptr && hero.isAlive() && target->isAlive()) {
+        recovery = RecoveryChance::None;  // attacking ends any chance to heal this round
         AttackResult result = hero.attack(*target);
 
         std::cout << "\nHero Attack Result\n";
@@ -135,8 +167,9 @@ bool Arena::processHeroTurn() {
     return true;
 }
 
-void Arena::processMonsterTurn(Monster& monster) {
-    if (!monster.isAlive() || !hero.isAlive()) return;
+// Returns true if the monster attacked the hero (hit or miss).
+bool Arena::processMonsterTurn(Monster& monster) {
+    if (!monster.isAlive() || !hero.isAlive()) return false;
 
     WorldState world = buildWorldStateForMonster(&monster);
     monster.move(world);
@@ -154,6 +187,33 @@ void Arena::processMonsterTurn(Monster& monster) {
         std::cout << "Damage done: " << result.damage << '\n';
         std::cout << "Opponent defeated: "
             << (result.targetDefeated ? "Yes" : "No") << '\n';
+        return true;
+    }
+
+    return false;
+}
+
+void Arena::tryHeroRecovery(RecoveryChance recovery) {
+    int amount = 0;
+
+    switch (recovery) {
+    case RecoveryChance::Moved:
+        if (Random::getUniformInt(1, 100) <= MoveRecoveryChancePercent) {
+            amount = 1;
+        }
+        break;
+    case RecoveryChance::Rested:
+        if (Random::getUniformInt(1, 100) <= RestRecoveryChancePercent) {
+            amount = Random::getUniformInt(MinRestRecovery, MaxRestRecovery);
+        }
+        break;
+    case RecoveryChance::None:
+        break;
+    }
+
+    int restored = hero.recoverHitPoints(amount);
+    if (restored > 0) {
+        std::cout << '\n' << hero.getName() << " recovers " << restored << " HP.\n";
     }
 }
 
