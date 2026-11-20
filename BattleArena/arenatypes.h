@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "position.h"
+#include "movementresult.h"
 
 // Read-only, value-based copies of the Arena state for a presentation layer.
 // They hold no pointers or references to the live Hero or Monster objects.
@@ -32,4 +33,13 @@ struct ArenaSnapshot {
     int monstersDefeated;
     bool battleOver;
     bool heroWon;
+};
+
+// The result of checking a player command without executing it.
+struct CommandPreview {
+    MovementResult status;
+    Position destination;   // proposed final square if valid; otherwise the hero's current square
+    std::string message;    // brief feedback for the player
+    bool canSubmit;         // valid command and the battle is still active
+    bool isRest;            // valid standalone R
 };

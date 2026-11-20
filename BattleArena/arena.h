@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 #include "hero.h"
 #include "monster.h"
@@ -22,6 +23,10 @@ public:
 
     // A value-based copy of the current state. Monster IDs are 1..N in insertion order.
     ArenaSnapshot getSnapshot() const;
+
+    // Checks a player command against the current state without executing it.
+    // Changes nothing: no movement, turn, attack, healing, or random numbers.
+    CommandPreview previewCommand(const std::string& command) const;
 
 private:
     WorldState buildWorldStateForHero() const;

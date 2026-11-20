@@ -6,6 +6,7 @@
 #include <set>
 #include <utility>
 #include <cctype>
+#include <string>
 #include "arena.h"
 #include "hero.h"
 #include "monster.h"
@@ -21,6 +22,18 @@ namespace {
     // Matches Hero::moveByPlayerCommand(), which treats "r" or "R" as resting.
     bool isRestCommand(const std::string& command) {
         return command == "r" || command == "R";
+    }
+
+    // Explains an InvalidCommand result. Hero::validateMoveCommand() checks length
+    // before characters, so an over-long command was rejected for exceeding speed.
+    std::string describeInvalidCommand(const std::string& command, int speed) {
+        if (command.empty()) {
+            return "Enter a command: W/A/S/D to move, R to rest.";
+        }
+        if (command.size() > static_cast<std::size_t>(speed)) {
+            return "Movement command exceeds hero speed (maximum " + std::to_string(speed) + ").";
+        }
+        return "Invalid movement command. Use W/A/S/D moves, or R alone to rest.";
     }
 
     CombatantSnapshot makeSnapshot(const Combatant& combatant, int id,
@@ -161,6 +174,32 @@ ArenaSnapshot Arena::getSnapshot() const {
     snapshot.battleOver = isBattleOver();
     snapshot.heroWon = heroWon();
     return snapshot;
+}
+
+CommandPreview Arena::previewCommand(const std::string& command) const {
+    if (isBattleOver()) {
+        return CommandPreview{ MovementResult::InvalidCommand, hero.getPosition(),
+            "Battle has ended.", false, false };
+    }
+
+    MovementValidation validation = hero.validateMoveCommand(command, buildWorldStateForHero());
+
+    CommandPreview preview{ validation.status, validation.destination, "",
+        validation.status == MovementResult::Success, validation.isRest };
+
+    switch (validation.status) {
+    case MovementResult::Success:
+        preview.message = validation.isRest ? "Rest." : "Move available.";
+        break;
+    case MovementResult::Blocked:
+        preview.message = "Movement blocked.";
+        break;
+    case MovementResult::InvalidCommand:
+        preview.message = describeInvalidCommand(command, hero.getSpeed());
+        break;
+    }
+
+    return preview;
 }
 
 // Returns false if input ended before the hero could take a turn.

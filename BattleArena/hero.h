@@ -18,6 +18,8 @@ public:
         const Position& position,
         const std::array<std::string, 6>& portrait);
 
+    // Checks a command and its whole path without moving. The single home of the movement rules.
+    MovementValidation validateMoveCommand(const std::string& commands, const WorldState& world) const;
     MovementResult moveByPlayerCommand(const std::string& commands, const WorldState& world);
     AttackResult attack(Combatant& target) override;
     std::string speak() const override;
