@@ -29,3 +29,7 @@ bool Goblin::isRetreating() const {
 	// Multiplying avoids the rounding that hitPoints < maxHitPoints / 3 would cause.
 	return hitPoints * 3 < maxHitPoints;
 }
+
+std::string Goblin::getTypeName() const {
+	return "Goblin";
+}

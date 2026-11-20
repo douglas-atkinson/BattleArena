@@ -5,6 +5,7 @@
 #include "hero.h"
 #include "monster.h"
 #include "worldstate.h"
+#include "arenatypes.h"
 
 class Arena {
 private:
@@ -19,12 +20,16 @@ public:
 
     void runBattle();
 
+    // A value-based copy of the current state. Monster IDs are 1..N in insertion order.
+    ArenaSnapshot getSnapshot() const;
+
 private:
     WorldState buildWorldStateForHero() const;
     WorldState buildWorldStateForMonster(const Monster* activeMonster) const;
 
     bool isBattleOver() const;
     bool heroWon() const;
+    bool hasLivingMonsters() const;
 
     // The healing opportunity the hero's turn earned, if the round stays peaceful.
     enum class RecoveryChance { None, Moved, Rested };
@@ -35,7 +40,6 @@ private:
 
     Monster* findAdjacentMonsterToHero();
 
-    void removeDeadMonsters();
     void printBattleState() const;
 
     void assignSymbols();

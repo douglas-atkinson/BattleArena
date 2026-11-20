@@ -10,6 +10,7 @@ public:
 
 	AttackResult attack(Combatant& target) override;
 	bool move(const WorldState& world) override;
+	std::string getTypeName() const override;
 
 	// Adds the sting bonus to the basic damage formula while a sting is in progress.
 	int calculateDamage(const Combatant& target) const override;

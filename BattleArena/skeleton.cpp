@@ -40,3 +40,7 @@ bool Skeleton::move(const WorldState& world) {
 bool Skeleton::canSeeHero(const WorldState& world) const {
 	return manhattanDistance(position, world.heroPosition) <= DetectionRange;
 }
+
+std::string Skeleton::getTypeName() const {
+	return "Skeleton";
+}

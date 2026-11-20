@@ -10,6 +10,7 @@ public:
 
 	AttackResult attack(Combatant& target) override;
 	bool move(const WorldState& world) override;
+	std::string getTypeName() const override;
 
 private:
 	bool isRetreating() const;

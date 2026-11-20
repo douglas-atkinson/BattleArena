@@ -10,6 +10,7 @@ public:
 
 	AttackResult attack(Combatant& target) override;
 	bool move(const WorldState& world) override;
+	std::string getTypeName() const override;
 
 	// Adjust the basic combat formulas while a crushing smash is in progress.
 	int calculateHitChance(const Combatant& target) const override;

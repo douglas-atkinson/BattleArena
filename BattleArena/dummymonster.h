@@ -10,5 +10,6 @@ public:
 
 	AttackResult attack(Combatant& target) override;
 	bool move(const WorldState& world) override;
+	std::string getTypeName() const override;
 	std::string speak() const override;
 };

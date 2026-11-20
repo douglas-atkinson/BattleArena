@@ -54,3 +54,7 @@ int Ogre::calculateDamage(const Combatant& target) const {
 	int damage = Combatant::calculateDamage(target);
 	return smashing ? damage + damage / 2 : damage;
 }
+
+std::string Ogre::getTypeName() const {
+	return "Ogre";
+}

@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <set>
 #include <utility>
+#include <cctype>
 #include "arena.h"
 #include "hero.h"
 #include "monster.h"
@@ -20,6 +21,25 @@ namespace {
     // Matches Hero::moveByPlayerCommand(), which treats "r" or "R" as resting.
     bool isRestCommand(const std::string& command) {
         return command == "r" || command == "R";
+    }
+
+    CombatantSnapshot makeSnapshot(const Combatant& combatant, int id,
+        const std::string& type, bool onBattlefield) {
+        return CombatantSnapshot{
+            id,
+            combatant.getName(),
+            type,
+            combatant.getPosition(),
+            combatant.getHitPoints(),
+            combatant.getMaxHitPoints(),
+            combatant.getStrength(),
+            combatant.getAccuracy(),
+            combatant.getAgility(),
+            combatant.getDefense(),
+            combatant.getSpeed(),
+            combatant.isAlive(),
+            onBattlefield
+        };
     }
 }
 
@@ -46,8 +66,6 @@ void Arena::runBattle() {
 			displayBattleField();
         }
 
-        removeDeadMonsters();
-
         if (isBattleOver()) break;
 
         bool heroWasAttacked = false;
@@ -67,8 +85,6 @@ void Arena::runBattle() {
         if (!heroWasAttacked) {
             tryHeroRecovery(recovery);
         }
-
-        removeDeadMonsters();
     }
 
     printBattleState();
@@ -84,8 +100,9 @@ void Arena::runBattle() {
 WorldState Arena::buildWorldStateForHero() const {
     std::vector<Position> monsterPositions;
 
+    // Defeated monsters stay on the battlefield as corpses and still block their squares.
     for (const auto& monsterPtr : monsters) {
-        if (monsterPtr->isAlive()) {
+        if (monsterPtr->isOnBattlefield()) {
             monsterPositions.push_back(monsterPtr->getPosition());
         }
     }
@@ -97,7 +114,7 @@ WorldState Arena::buildWorldStateForMonster(const Monster* activeMonster) const 
     std::vector<Position> monsterPositions;
 
     for (const auto& monsterPtr : monsters) {
-        if (monsterPtr.get() != activeMonster && monsterPtr->isAlive()) {
+        if (monsterPtr.get() != activeMonster && monsterPtr->isOnBattlefield()) {
             monsterPositions.push_back(monsterPtr->getPosition());
         }
     }
@@ -106,11 +123,44 @@ WorldState Arena::buildWorldStateForMonster(const Monster* activeMonster) const 
 }
 
 bool Arena::isBattleOver() const {
-    return !hero.isAlive() || monsters.empty();
+    return !hero.isAlive() || !hasLivingMonsters();
 }
 
 bool Arena::heroWon() const {
-    return hero.isAlive() && monsters.empty();
+    return hero.isAlive() && !hasLivingMonsters();
+}
+
+// Defeated monsters stay in the collection, so victory depends on living monsters only.
+bool Arena::hasLivingMonsters() const {
+    for (const auto& monsterPtr : monsters) {
+        if (monsterPtr->isAlive()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+ArenaSnapshot Arena::getSnapshot() const {
+    ArenaSnapshot snapshot{};
+    snapshot.rows = rows;
+    snapshot.cols = cols;
+    snapshot.hero = makeSnapshot(hero, 0, "Hero", true);
+    snapshot.heroLevel = hero.getLevel();
+    snapshot.monstersDefeated = 0;
+
+    // Monsters are never removed or reordered, so index + 1 is a stable ID.
+    for (std::size_t i = 0; i < monsters.size(); ++i) {
+        const Monster& monster = *monsters[i];
+        snapshot.monsters.push_back(makeSnapshot(monster, static_cast<int>(i) + 1,
+            monster.getTypeName(), monster.isOnBattlefield()));
+        if (!monster.isAlive()) {
+            ++snapshot.monstersDefeated;
+        }
+    }
+
+    snapshot.battleOver = isBattleOver();
+    snapshot.heroWon = heroWon();
+    return snapshot;
 }
 
 // Returns false if input ended before the hero could take a turn.
@@ -226,11 +276,6 @@ Monster* Arena::findAdjacentMonsterToHero() {
     }
 
     return nullptr;
-}
-
-void Arena::removeDeadMonsters() {
-    std::erase_if(monsters, [](const auto& m) { return !m->isAlive(); });
-
 }
 
 void Arena::printBattleState() const {
@@ -358,8 +403,10 @@ void Arena::displayBattleField() const {
             else {
                 // Check monsters
                 for (const auto& monster : monsters) {
-                    if (monster->isAlive() && monster->getPosition() == current) {
-                        symbol = monster->getSymbol();
+                    if (monster->isOnBattlefield() && monster->getPosition() == current) {
+                        // A corpse shows its symbol in lowercase.
+                        symbol = monster->isAlive() ? monster->getSymbol()
+                            : static_cast<char>(std::tolower(static_cast<unsigned char>(monster->getSymbol())));
                         break;
 					}
                 }
@@ -374,7 +421,13 @@ void Arena::displayBattleField() const {
 void Arena::displayBattleFieldLegend() const {
     std::cout << hero.getSymbol() << " = Hero\n";
     for (const auto& monster : monsters) {
-        std::cout << monster->getSymbol() << " = Monster\n";
+        if (monster->isAlive()) {
+            std::cout << monster->getSymbol() << " = Monster\n";
+        }
+        else if (monster->isOnBattlefield()) {
+            std::cout << static_cast<char>(std::tolower(static_cast<unsigned char>(monster->getSymbol())))
+                << " = Defeated monster\n";
+        }
     }
     std::cout << '\n';
 }

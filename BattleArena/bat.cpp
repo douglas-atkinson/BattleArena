@@ -54,3 +54,7 @@ int Bat::calculateDamage(const Combatant& target) const {
 	int damage = Combatant::calculateDamage(target);
 	return stinging ? damage + StingBonusDamage : damage;
 }
+
+std::string Bat::getTypeName() const {
+	return "Bat";
+}

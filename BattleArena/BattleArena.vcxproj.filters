@@ -45,6 +45,9 @@
     <ClInclude Include="arena.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="arenatypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="movementresult.h">
       <Filter>Header Files</Filter>
     </ClInclude>

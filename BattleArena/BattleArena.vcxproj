@@ -128,6 +128,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="arena.h" />
+    <ClInclude Include="arenatypes.h" />
     <ClInclude Include="attackresult.h" />
     <ClInclude Include="bat.h" />
     <ClInclude Include="combatant.h" />
