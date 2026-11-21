@@ -9,6 +9,7 @@
 //   --hover <x> <y>           simulate the mouse at a view position (with --screenshot)
 //   --log-scroll <lines>      start with the combat log scrolled up (clamped)
 //   --log-entries <n>         keep only the n newest sample log entries
+//   --grid <cols>x<rows>      battlefield size for presentation tests (default 30x16)
 
 #include "Layout.hpp"
 #include "LogScroll.hpp"
@@ -18,6 +19,7 @@
 #include <SFML/Graphics.hpp>
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <iostream>
 #include <optional>
@@ -54,6 +56,22 @@ sf::Vector2u initialWindowSize()
     return {static_cast<unsigned>(layout::viewW * scale), static_cast<unsigned>(layout::viewH * scale)};
 }
 
+// Parses "<cols>x<rows>", e.g. "10x10". Returns nothing if the text is malformed.
+std::optional<layout::Grid> parseGrid(const std::string& text)
+{
+    const std::size_t x = text.find_first_of("xX");
+    if (x == std::string::npos)
+        return std::nullopt;
+    layout::Grid grid;
+    const char* begin = text.data();
+    const char* end = begin + text.size();
+    const auto cols = std::from_chars(begin, begin + x, grid.cols);
+    const auto rows = std::from_chars(begin + x + 1, end, grid.rows);
+    if (cols.ec != std::errc{} || cols.ptr != begin + x || rows.ec != std::errc{} || rows.ptr != end)
+        return std::nullopt;
+    return grid;
+}
+
 logscroll::Geometry logGeometry(const MockState& state, const UiState& ui)
 {
     return logscroll::geometry(static_cast<int>(state.log.size()), ui.logScroll);
@@ -63,7 +81,7 @@ void updateHover(UiState& ui, const MockState& state, sf::Vector2f mouse)
 {
     ui.mouse = mouse;
     ui.hovered = characterAt(mouse, state);
-    ui.hoveredTile = tileAt(mouse);
+    ui.hoveredTile = tileAt(mouse, state);
 }
 
 void handleKey(sf::Keyboard::Key key, UiState& ui, MockState& state, sf::RenderWindow& window)
@@ -107,6 +125,7 @@ int main(int argc, char** argv)
     std::optional<std::string> screenshotPath;
     std::optional<int> logEntries;
     UiState ui;
+    layout::Grid grid;
     for (int i = 1; i < argc; ++i)
     {
         const std::string arg = argv[i];
@@ -123,15 +142,33 @@ int main(int argc, char** argv)
             ui.logScroll = std::stoi(argv[++i]);
         else if (arg == "--log-entries" && i + 1 < argc)
             logEntries = std::stoi(argv[++i]);
+        else if (arg == "--grid" && i + 1 < argc)
+        {
+            const std::string text = argv[++i];
+            const std::optional<layout::Grid> parsed = parseGrid(text);
+            if (!parsed)
+            {
+                std::cerr << "Invalid --grid value '" << text << "'. Use <cols>x<rows>, for example 10x10.\n";
+                return 2;
+            }
+            if (!layout::Grid::supports(parsed->cols, parsed->rows))
+            {
+                std::cerr << "Unsupported grid size " << parsed->cols << "x" << parsed->rows << ". Columns must be "
+                          << layout::Grid::minCols << "-" << layout::Grid::maxCols << " and rows "
+                          << layout::Grid::minRows << "-" << layout::Grid::maxRows << ".\n";
+                return 2;
+            }
+            grid = *parsed;
+        }
     }
 
     const std::filesystem::path exeDir =
         argc > 0 ? std::filesystem::absolute(argv[0]).parent_path() : std::filesystem::current_path();
     Assets assets;
-    if (!assets.load(exeDir))
+    if (!assets.load(exeDir, grid))
         return 1;
 
-    MockState state = makeSampleState();
+    MockState state = makeSampleState(grid);
     if (logEntries && *logEntries >= 0 && static_cast<std::size_t>(*logEntries) < state.log.size())
         state.log.erase(state.log.begin(), state.log.end() - *logEntries);
     ui.logScroll = logscroll::clampScroll(ui.logScroll, static_cast<int>(state.log.size()));

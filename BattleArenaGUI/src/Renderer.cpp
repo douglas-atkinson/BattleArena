@@ -10,6 +10,7 @@
 #include <SFML/Graphics/Text.hpp>
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <iostream>
 #include <vector>
@@ -240,6 +241,8 @@ void drawTitleBar(sf::RenderTarget& t, const Assets& a, const MockState& s)
 void drawBattlefield(sf::RenderTarget& t, const Assets& a, const MockState& s, const UiState& ui)
 {
     const R r = layout::battlefield;
+    const layout::Grid& grid = s.grid;
+    assert(a.battlefieldGrid == grid && "call Assets::prepareBattlefield() after changing the grid");
     drawFrame(t, a, r, false);
     // The battlefield art fills the frame interior (art pixel 5 == screen pixel 10).
     sf::Sprite inner(a.battlefield);
@@ -252,7 +255,7 @@ void drawBattlefield(sf::RenderTarget& t, const Assets& a, const MockState& s, c
     // Hovered tile highlight.
     if (ui.hoveredTile)
     {
-        const R tile = layout::tileRect(ui.hoveredTile->x, ui.hoveredTile->y);
+        const R tile = grid.tileRect(*ui.hoveredTile);
         fillRect(t, tile, C(255, 236, 190, 28));
         outlineRect(t, tile, withAlpha(pal::text, 150), 1.f);
     }
@@ -266,7 +269,7 @@ void drawBattlefield(sf::RenderTarget& t, const Assets& a, const MockState& s, c
     for (int i : order)
     {
         const Character& c = s.characters[static_cast<std::size_t>(i)];
-        const R tile = layout::tileRect(c.tile.x, c.tile.y);
+        const R tile = grid.tileRect(c.tile);
         if (!c.alive())
         {
             drawImage(t, a.bonePile, tile.position, layout::artScale, C(200, 196, 186));
@@ -293,7 +296,7 @@ void drawBattlefield(sf::RenderTarget& t, const Assets& a, const MockState& s, c
     if (ui.selected >= 0)
     {
         const Character& c = s.characters[static_cast<std::size_t>(ui.selected)];
-        const R tile = shrink(layout::tileRect(c.tile.x, c.tile.y), -3.f);
+        const R tile = shrink(grid.tileRect(c.tile), -3.f);
         const float L = 8.f, th = 2.f;
         const C g = pal::goldBright;
         const float x0 = tile.position.x, y0 = tile.position.y;
@@ -629,7 +632,23 @@ void drawStatusLine(sf::RenderTarget& t, const Assets& a)
 }
 } // namespace
 
-bool Assets::load(const std::filesystem::path& exeDir)
+bool Assets::prepareBattlefield(const layout::Grid& grid)
+{
+    if (battlefieldReady && grid == battlefieldGrid)
+        return true;
+    art::BattlefieldSpec spec;  // fixed visual seed: the same grid always looks the same
+    spec.cols = static_cast<unsigned>(grid.cols);
+    spec.rows = static_cast<unsigned>(grid.rows);
+    spec.gridOrigin = grid.artOrigin();
+    if (!battlefield.loadFromImage(art::buildBattlefield(spec)))
+        return false;
+    battlefield.setSmooth(false);
+    battlefieldGrid = grid;
+    battlefieldReady = true;
+    return true;
+}
+
+bool Assets::load(const std::filesystem::path& exeDir, const layout::Grid& grid)
 {
     std::filesystem::path dir;
     for (const auto& candidate : {exeDir / "assets", std::filesystem::current_path() / "assets"})
@@ -651,7 +670,7 @@ bool Assets::load(const std::filesystem::path& exeDir)
         return true;
     };
 
-    bool ok = make(battlefield, art::buildBattlefield({}));
+    bool ok = prepareBattlefield(grid);
     ok = ok && make(panelNoise, art::buildPanelNoise(128, sf::Color(40, 38, 35), 11));
     ok = ok && make(cardNoise, art::buildPanelNoise(128, sf::Color(28, 26, 24), 23));
     panelNoise.setRepeated(true);
@@ -684,22 +703,15 @@ void drawScene(sf::RenderTarget& target, const Assets& assets, const MockState& 
     drawStatusLine(target, assets);
 }
 
-std::optional<sf::Vector2i> tileAt(sf::Vector2f p)
+std::optional<sf::Vector2i> tileAt(sf::Vector2f p, const MockState& state)
 {
-    const V local = p - layout::gridOrigin;
-    if (local.x < 0.f || local.y < 0.f)
-        return std::nullopt;
-    const int col = static_cast<int>(local.x / layout::tileSize);
-    const int row = static_cast<int>(local.y / layout::tileSize);
-    if (col >= layout::gridCols || row >= layout::gridRows)
-        return std::nullopt;
-    return sf::Vector2i{col, row};
+    return state.grid.tileAt(p);
 }
 
 int characterAt(sf::Vector2f p, const MockState& state)
 {
     const int n = static_cast<int>(state.characters.size());
-    if (const auto tile = tileAt(p))
+    if (const auto tile = state.grid.tileAt(p))
         for (int i = 0; i < n; ++i)
             if (state.characters[static_cast<std::size_t>(i)].tile == *tile)
                 return i;

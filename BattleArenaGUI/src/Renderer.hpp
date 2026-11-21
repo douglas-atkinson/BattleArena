@@ -3,6 +3,7 @@
 // Presentation layer for the mockup. Reads MockState, never modifies it.
 
 #include "Art.hpp"
+#include "Layout.hpp"
 #include "MockData.hpp"
 
 #include <SFML/Graphics/Font.hpp>
@@ -17,7 +18,8 @@
 struct Assets
 {
     sf::Font font;
-    sf::Texture battlefield;
+    sf::Texture battlefield;     // floor, frame, walls and torches, generated once per grid size
+    layout::Grid battlefieldGrid;  // the grid the battlefield texture was generated for
     sf::Texture panelNoise;
     sf::Texture cardNoise;
     std::array<sf::Texture, art::kindCount> sprites;
@@ -28,7 +30,13 @@ struct Assets
     sf::Texture skull;
 
     // Looks for assets/ next to the executable, then in the working directory.
-    bool load(const std::filesystem::path& exeDir);
+    bool load(const std::filesystem::path& exeDir, const layout::Grid& grid);
+
+    // Regenerates the battlefield texture only if the grid differs from the cached one.
+    bool prepareBattlefield(const layout::Grid& grid);
+
+private:
+    bool battlefieldReady = false;
 };
 
 struct UiState
@@ -47,5 +55,5 @@ void drawScene(sf::RenderTarget& target, const Assets& assets, const MockState& 
 
 // Hit testing in view coordinates.
 int characterAt(sf::Vector2f point, const MockState& state);
-std::optional<sf::Vector2i> tileAt(sf::Vector2f point);
+std::optional<sf::Vector2i> tileAt(sf::Vector2f point, const MockState& state);
 bool isOverLog(sf::Vector2f point);
