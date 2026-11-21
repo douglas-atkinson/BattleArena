@@ -1,11 +1,9 @@
 #include <vector>
 #include <memory>
 #include <cmath>
-#include <iostream>
 #include <stdexcept>
 #include <set>
 #include <utility>
-#include <cctype>
 #include <string>
 #include "arena.h"
 #include "hero.h"
@@ -19,11 +17,6 @@ namespace {
     const int MinRestRecovery = 1;
     const int MaxRestRecovery = 3;
 
-    // Matches Hero::moveByPlayerCommand(), which treats "r" or "R" as resting.
-    bool isRestCommand(const std::string& command) {
-        return command == "r" || command == "R";
-    }
-
     // Explains an InvalidCommand result. Hero::validateMoveCommand() checks length
     // before characters, so an over-long command was rejected for exceeding speed.
     std::string describeInvalidCommand(const std::string& command, int speed) {
@@ -33,7 +26,38 @@ namespace {
         if (command.size() > static_cast<std::size_t>(speed)) {
             return "Movement command exceeds hero speed (maximum " + std::to_string(speed) + ").";
         }
-        return "Invalid movement command. Use W/A/S/D moves, or R alone to rest.";
+        return "Invalid command. Use W/A/S/D moves, R to rest, or F to fight.";
+    }
+
+    bool isFightCommand(const std::string& command) {
+        return command == "f" || command == "F";
+    }
+
+    std::string formatPosition(const Position& pos) {
+        return "(" + std::to_string(pos.row) + ", " + std::to_string(pos.col) + ")";
+    }
+
+    // Turns one attack into log lines: who attacked, any special-attack messages,
+    // the hit or miss with damage and remaining HP, and a defeat.
+    void appendAttackMessages(const Combatant& attacker, const Combatant& target,
+        const AttackResult& result, std::vector<std::string>& messages) {
+        messages.push_back(attacker.getName() + " attacks " + target.getName() + ".");
+        for (const std::string& message : result.messages) {
+            if (!message.empty()) {
+                messages.push_back(message);
+            }
+        }
+        if (result.hit) {
+            messages.push_back("Hit! " + target.getName() + " takes " + std::to_string(result.damage)
+                + " damage (HP " + std::to_string(target.getHitPoints()) + " / "
+                + std::to_string(target.getMaxHitPoints()) + ").");
+        }
+        else {
+            messages.push_back(attacker.getName() + " misses.");
+        }
+        if (result.targetDefeated) {
+            messages.push_back(target.getName() + " is defeated!");
+        }
     }
 
     CombatantSnapshot makeSnapshot(const Combatant& combatant, int id,
@@ -42,6 +66,7 @@ namespace {
             id,
             combatant.getName(),
             type,
+            combatant.getSymbol(),
             combatant.getPosition(),
             combatant.getHitPoints(),
             combatant.getMaxHitPoints(),
@@ -60,54 +85,6 @@ Arena::Arena(Hero hero, std::vector<std::unique_ptr<Monster>> monsters, int rows
     : hero(std::move(hero)), monsters(std::move(monsters)), rows(rows), cols(cols) {
     validateStartState();
     assignSymbols();
-}
-
-void Arena::runBattle() {
-    while (!isBattleOver()) {
-        printBattleState();
-
-        RecoveryChance recovery = RecoveryChance::None;
-
-        if (hero.isAlive()) {
-			displayBattleFieldLegend();
-			displayBattleField();
-            if (!processHeroTurn(recovery)) {
-                std::cout << "\nInput ended. Battle abandoned.\n";
-                return;
-            }
-			displayBattleFieldLegend();
-			displayBattleField();
-        }
-
-        if (isBattleOver()) break;
-
-        bool heroWasAttacked = false;
-
-        for (auto& monsterPtr : monsters) {
-            if (!monsterPtr->isAlive()) continue;
-
-            if (processMonsterTurn(*monsterPtr)) {
-                heroWasAttacked = true;
-            }
-
-            if (!hero.isAlive()) break;
-        }
-
-        // Healing happens only in a peaceful round: no monster attacked the hero,
-        // and processHeroTurn() already cleared the chance if the hero attacked.
-        if (!heroWasAttacked) {
-            tryHeroRecovery(recovery);
-        }
-    }
-
-    printBattleState();
-
-    if (heroWon()) {
-        std::cout << "Victory!\n";
-    }
-    else {
-        std::cout << "Game Over.\n";
-    }
 }
 
 WorldState Arena::buildWorldStateForHero() const {
@@ -153,6 +130,11 @@ bool Arena::hasLivingMonsters() const {
     return false;
 }
 
+// The single Fight rule, shared by snapshots, previews, and submissions.
+bool Arena::canHeroFight() const {
+    return !isBattleOver() && findAdjacentMonsterToHero() != nullptr;
+}
+
 ArenaSnapshot Arena::getSnapshot() const {
     ArenaSnapshot snapshot{};
     snapshot.rows = rows;
@@ -173,91 +155,147 @@ ArenaSnapshot Arena::getSnapshot() const {
 
     snapshot.battleOver = isBattleOver();
     snapshot.heroWon = heroWon();
+    snapshot.roundsCompleted = roundsCompleted;
+    snapshot.heroTitle = hero.getTitleString();
+    snapshot.canFight = canHeroFight();
     return snapshot;
 }
 
+std::string Arena::describeValidation(const MovementValidation& validation,
+    const std::string& command) const {
+    switch (validation.status) {
+    case MovementResult::Success:
+        return validation.isRest ? "Rest." : "Move available.";
+    case MovementResult::Blocked:
+        return "Movement blocked.";
+    case MovementResult::InvalidCommand:
+        break;
+    }
+    return describeInvalidCommand(command, hero.getSpeed());
+}
+
+// Fight is Arena's rule (it needs an adjacent living monster); moves and rest use
+// Hero's shared movement validator. submitCommand() relies on this same check.
 CommandPreview Arena::previewCommand(const std::string& command) const {
     if (isBattleOver()) {
         return CommandPreview{ MovementResult::InvalidCommand, hero.getPosition(),
-            "Battle has ended.", false, false };
+            "Battle has ended.", false, PlayerAction::Move };
+    }
+
+    if (isFightCommand(command)) {
+        if (canHeroFight()) {
+            return CommandPreview{ MovementResult::Success, hero.getPosition(),
+                "Fight.", true, PlayerAction::Fight };
+        }
+        return CommandPreview{ MovementResult::InvalidCommand, hero.getPosition(),
+            "No living monster is adjacent to fight.", false, PlayerAction::Fight };
     }
 
     MovementValidation validation = hero.validateMoveCommand(command, buildWorldStateForHero());
 
-    CommandPreview preview{ validation.status, validation.destination, "",
-        validation.status == MovementResult::Success, validation.isRest };
-
-    switch (validation.status) {
-    case MovementResult::Success:
-        preview.message = validation.isRest ? "Rest." : "Move available.";
-        break;
-    case MovementResult::Blocked:
-        preview.message = "Movement blocked.";
-        break;
-    case MovementResult::InvalidCommand:
-        preview.message = describeInvalidCommand(command, hero.getSpeed());
-        break;
-    }
-
-    return preview;
+    return CommandPreview{ validation.status, validation.destination,
+        describeValidation(validation, command),
+        validation.status == MovementResult::Success,
+        validation.isRest ? PlayerAction::Rest : PlayerAction::Move };
 }
 
-// Returns false if input ended before the hero could take a turn.
-// Sets recovery to the healing chance earned: Moved or Rested, or None if the
-// move was blocked or the hero attacked.
-bool Arena::processHeroTurn(RecoveryChance& recovery) {
-    recovery = RecoveryChance::None;
-    WorldState world = buildWorldStateForHero();
+// One complete round: the hero's action (a move with its automatic attack, a rest,
+// or a fight), then (if the battle continues) each living monster's turn, then
+// peaceful-round healing. Rejected commands change nothing.
+TurnResult Arena::submitCommand(const std::string& command) {
+    // Validate independently of any earlier preview, with the same rules preview uses.
+    CommandPreview check = previewCommand(command);
+    if (!check.canSubmit) {
+        return TurnResult{ false, getSnapshot(), { check.message } };
+    }
 
-    std::string command;
-    MovementResult result = MovementResult::InvalidCommand;
+    std::vector<std::string> messages;
+    RecoveryChance recovery = RecoveryChance::None;
 
-    while (result == MovementResult::InvalidCommand) {
-        std::cout << "Enter movement command (W/A/S/D/R): ";
-        if (!std::getline(std::cin, command)) {
-            return false;
+    switch (check.action) {
+    case PlayerAction::Move:
+        // Just validated against the current state, so this always succeeds.
+        hero.moveByPlayerCommand(command, buildWorldStateForHero());
+        messages.push_back(hero.getName() + " moves to " + formatPosition(hero.getPosition()) + ".");
+        recovery = RecoveryChance::Moved;
+        if (processHeroAttack(messages)) {
+            recovery = RecoveryChance::None;  // attacking ends any chance to heal this round
         }
-
-        result = hero.moveByPlayerCommand(command, world);
-        if (result == MovementResult::InvalidCommand) {
-            std::cout << "Invalid input. Enter R to rest, or W/A/S/D moves (maximum "
-                << hero.getSpeed() << ").\n";
-        }
+        break;
+    case PlayerAction::Rest:
+        messages.push_back(hero.getName() + " rests.");  // resting never attacks
+        recovery = RecoveryChance::Rested;
+        break;
+    case PlayerAction::Fight:
+        messages.push_back(hero.getName() + " holds position and fights.");
+        processHeroAttack(messages);  // fighting never earns a healing chance
+        break;
     }
 
-    if (result == MovementResult::Blocked) {
-        std::cout << "You cannot move there.\n";
-    }
-    else {
-        recovery = isRestCommand(command) ? RecoveryChance::Rested : RecoveryChance::Moved;
-    }
+    // A hero victory ends the battle at once: no monster turns, no healing.
+    if (!isBattleOver()) {
+        bool heroWasAttacked = false;
 
-    Monster* target = findAdjacentMonsterToHero();
-    if (target != nullptr && hero.isAlive() && target->isAlive()) {
-        recovery = RecoveryChance::None;  // attacking ends any chance to heal this round
-        AttackResult result = hero.attack(*target);
+        for (auto& monsterPtr : monsters) {
+            if (!monsterPtr->isAlive()) continue;
 
-        std::cout << "\nHero Attack Result\n";
-        for (const std::string& message : result.messages) {
-            if (!message.empty()) {
-                std::cout << message << '\n';
+            if (processMonsterTurn(*monsterPtr, messages)) {
+                heroWasAttacked = true;
             }
-        }
-        std::cout << "Hit: " << (result.hit ? "Yes" : "No") << '\n';
-        std::cout << "Damage done: " << result.damage << '\n';
-        std::cout << "Opponent defeated: "
-            << (result.targetDefeated ? "Yes" : "No") << '\n';
 
-        if (result.targetDefeated) {
-            hero.recordVictory();
+            if (!hero.isAlive()) break;
+        }
+
+        // Healing happens only in a peaceful round: no monster attacked the hero (hit
+        // or miss), and the chance was already cleared above if the hero attacked.
+        if (!heroWasAttacked) {
+            tryHeroRecovery(recovery, messages);
+        }
+    }
+
+    ++roundsCompleted;
+
+    if (heroWon()) {
+        messages.push_back("All monsters are defeated. " + hero.getName() + " is victorious!");
+    }
+    else if (!hero.isAlive()) {
+        messages.push_back(hero.getName() + " has fallen. The battle is lost.");
+    }
+
+    return TurnResult{ true, getSnapshot(), messages };
+}
+
+// Resolves the hero's automatic attack on an adjacent living monster, if any.
+// Returns true if the hero attacked (hit or miss).
+bool Arena::processHeroAttack(std::vector<std::string>& messages) {
+    Monster* target = findAdjacentMonsterToHero();
+    if (target == nullptr || !hero.isAlive() || !target->isAlive()) {
+        return false;
+    }
+
+    AttackResult result = hero.attack(*target);
+    appendAttackMessages(hero, *target, result, messages);
+
+    if (result.targetDefeated) {
+        int levelBefore = hero.getLevel();
+        int maxHitPointsBefore = hero.getMaxHitPoints();
+        hero.recordVictory();
+
+        if (hero.getLevel() > levelBefore) {
+            messages.push_back(hero.getName() + " reaches level " + std::to_string(hero.getLevel()) + "!");
+        }
+        if (hero.getMaxHitPoints() > maxHitPointsBefore) {
+            messages.push_back(hero.getName() + "'s maximum HP rises to "
+                + std::to_string(hero.getMaxHitPoints()) + ".");
         }
     }
 
     return true;
 }
 
+// Moves the monster, then attacks if it ends adjacent to the hero.
 // Returns true if the monster attacked the hero (hit or miss).
-bool Arena::processMonsterTurn(Monster& monster) {
+bool Arena::processMonsterTurn(Monster& monster, std::vector<std::string>& messages) {
     if (!monster.isAlive() || !hero.isAlive()) return false;
 
     WorldState world = buildWorldStateForMonster(&monster);
@@ -265,24 +303,14 @@ bool Arena::processMonsterTurn(Monster& monster) {
 
     if (hero.isAlive() && areOrthogonallyAdjacent(monster.getPosition(), hero.getPosition())) {
         AttackResult result = monster.attack(hero);
-
-        std::cout << "\n" << monster.getName() << "'s Attack Result\n";
-        for (const std::string& message : result.messages) {
-            if (!message.empty()) {
-                std::cout << message << '\n';
-            }
-        }
-        std::cout << "Hit: " << (result.hit ? "Yes" : "No") << '\n';
-        std::cout << "Damage done: " << result.damage << '\n';
-        std::cout << "Opponent defeated: "
-            << (result.targetDefeated ? "Yes" : "No") << '\n';
+        appendAttackMessages(monster, hero, result, messages);
         return true;
     }
 
     return false;
 }
 
-void Arena::tryHeroRecovery(RecoveryChance recovery) {
+void Arena::tryHeroRecovery(RecoveryChance recovery, std::vector<std::string>& messages) {
     int amount = 0;
 
     switch (recovery) {
@@ -302,12 +330,12 @@ void Arena::tryHeroRecovery(RecoveryChance recovery) {
 
     int restored = hero.recoverHitPoints(amount);
     if (restored > 0) {
-        std::cout << '\n' << hero.getName() << " recovers " << restored << " HP.\n";
+        messages.push_back(hero.getName() + " recovers " + std::to_string(restored) + " HP.");
     }
 }
 
-Monster* Arena::findAdjacentMonsterToHero() {
-    for (auto& monsterPtr : monsters) {
+Monster* Arena::findAdjacentMonsterToHero() const {
+    for (const auto& monsterPtr : monsters) {
         if (monsterPtr->isAlive() &&
             areOrthogonallyAdjacent(hero.getPosition(), monsterPtr->getPosition())) {
             return monsterPtr.get();
@@ -315,40 +343,6 @@ Monster* Arena::findAdjacentMonsterToHero() {
     }
 
     return nullptr;
-}
-
-void Arena::printBattleState() const {
-    std::cout << "\n========================================\n";
-    std::cout << "Current Battle State\n";
-    std::cout << "========================================\n";
-
-    std::cout << "Hero: " << hero.getName() << '\n';
-    std::cout << "Position: (" << hero.getPosition().row
-        << ", " << hero.getPosition().col << ")\n";
-    std::cout << "HP: " << hero.getHitPoints()
-        << " / " << hero.getMaxHitPoints() << '\n';
-    std::cout << "Level: " << hero.getLevel() << '\n';
-    std::cout << "Victories: " << hero.getVictories() << '\n';
-    std::cout << "Status: " << (hero.isAlive() ? "Alive" : "Dead") << "\n\n";
-
-    std::cout << "Monsters:\n";
-
-    if (monsters.empty()) {
-        std::cout << "None\n";
-    }
-    else {
-        for (size_t i = 0; i < monsters.size(); ++i) {
-            const Monster& monster = *monsters[i];
-
-            std::cout << i + 1 << ". " << monster.getName() << '\n';
-            std::cout << "   Position: (" << monster.getPosition().row
-                << ", " << monster.getPosition().col << ")\n";
-            std::cout << "   HP: " << monster.getHitPoints()
-                << " / " << monster.getMaxHitPoints() << '\n';
-            std::cout << "   Status: "
-                << (monster.isAlive() ? "Alive" : "Dead") << "\n\n";
-        }
-    }
 }
 
 void Arena::assignSymbols() {
@@ -427,46 +421,4 @@ void Arena::validateNoOverlappingCombatants() const {
 
 bool Arena::inBounds(int row, int col) const {
     return (row >= 0 && row < rows && col >= 0 && col < cols);
-}
-
-void Arena::displayBattleField() const {
-    for (int row = 0; row < rows; ++row) {
-        for (int col = 0; col < cols; ++col) {
-
-			Position current{ row, col };
-            char symbol = '.';
-
-            if (hero.getPosition() == current) {
-                symbol = hero.getSymbol();
-            }
-            else {
-                // Check monsters
-                for (const auto& monster : monsters) {
-                    if (monster->isOnBattlefield() && monster->getPosition() == current) {
-                        // A corpse shows its symbol in lowercase.
-                        symbol = monster->isAlive() ? monster->getSymbol()
-                            : static_cast<char>(std::tolower(static_cast<unsigned char>(monster->getSymbol())));
-                        break;
-					}
-                }
-            }
-            std::cout << symbol << ' ';
-        }
-        std::cout << '\n';
-	}
-	std::cout << '\n';
-}
-
-void Arena::displayBattleFieldLegend() const {
-    std::cout << hero.getSymbol() << " = Hero\n";
-    for (const auto& monster : monsters) {
-        if (monster->isAlive()) {
-            std::cout << monster->getSymbol() << " = Monster\n";
-        }
-        else if (monster->isOnBattlefield()) {
-            std::cout << static_cast<char>(std::tolower(static_cast<unsigned char>(monster->getSymbol())))
-                << " = Defeated monster\n";
-        }
-    }
-    std::cout << '\n';
 }
