@@ -189,15 +189,18 @@ void drawDiamond(sf::RenderTarget& t, V center, float px, C color)
     }
 }
 
-void drawKeyCap(sf::RenderTarget& t, const sf::Font& font, const std::string& label, V pos, float& outWidth)
+// A muted key cap marks a command that is currently unavailable (same size, darker and faded).
+void drawKeyCap(sf::RenderTarget& t, const sf::Font& font, const std::string& label, V pos, float& outWidth,
+                bool muted = false)
 {
     const float w = std::max(24.f, textWidth(font, label, 15) + 14.f);
     const R r{pos, {w, 24.f}};
     fillRect(t, r, C(12, 11, 10));
-    fillRect(t, shrink(r, 1.f), C(68, 60, 50));
-    fillRect(t, {{r.position.x + 1.f, r.position.y + 1.f}, {w - 2.f, 2.f}}, C(118, 104, 84));
-    fillRect(t, {{r.position.x + 1.f, r.position.y + r.size.y - 4.f}, {w - 2.f, 3.f}}, C(36, 32, 26));
-    drawText(t, font, label, {pos.x + (w - textWidth(font, label, 15)) / 2.f, pos.y + 2.f}, 15, pal::text);
+    fillRect(t, shrink(r, 1.f), muted ? C(38, 35, 31) : C(68, 60, 50));
+    fillRect(t, {{r.position.x + 1.f, r.position.y + 1.f}, {w - 2.f, 2.f}}, muted ? C(58, 53, 46) : C(118, 104, 84));
+    fillRect(t, {{r.position.x + 1.f, r.position.y + r.size.y - 4.f}, {w - 2.f, 3.f}}, muted ? C(24, 22, 19) : C(36, 32, 26));
+    drawText(t, font, label, {pos.x + (w - textWidth(font, label, 15)) / 2.f, pos.y + 2.f}, 15,
+             muted ? pal::textFaint : pal::text);
     outWidth = w;
 }
 
@@ -210,7 +213,7 @@ const sf::Texture& spriteFor(const Assets& a, const Character& c)
 // Regions
 // ---------------------------------------------------------------------------
 
-void drawTitleBar(sf::RenderTarget& t, const Assets& a, const MockState& s)
+void drawTitleBar(sf::RenderTarget& t, const Assets& a, const ViewState& s)
 {
     const R r = layout::titleBar;
     drawFrame(t, a, r);
@@ -220,8 +223,7 @@ void drawTitleBar(sf::RenderTarget& t, const Assets& a, const MockState& s)
     const float subX = r.position.x + 44.f + pixelfont::measure("BATTLE ARENA", 4.f) + 26.f;
     drawText(t, a.font, "The Proving Grounds", {subX, cy - 10.f}, 17, pal::textDim);
 
-    // Right side: LEVEL n  <>  ROUND n
-    const std::string level = std::to_string(s.arenaLevel);
+    // Right side: ROUND n (the model has no arena levels)
     const std::string round = std::to_string(s.round);
     const pixelfont::Style label{2.f, pal::textDim, lighten(pal::textDim, -16), true};
     const pixelfont::Style value = heading(3.f);
@@ -230,15 +232,9 @@ void drawTitleBar(sf::RenderTarget& t, const Assets& a, const MockState& s)
     pixelfont::draw(t, round, {x, cy - 10.f}, value);
     x -= pixelfont::measure("ROUND", 2.f) + 10.f;
     pixelfont::draw(t, "ROUND", {x, cy - 6.f}, label);
-    x -= 26.f;
-    drawDiamond(t, {x + 9.f, cy + 1.f}, 2.f, pal::gold);
-    x -= pixelfont::measure(level, 3.f) + 6.f;
-    pixelfont::draw(t, level, {x, cy - 10.f}, value);
-    x -= pixelfont::measure("LEVEL", 2.f) + 10.f;
-    pixelfont::draw(t, "LEVEL", {x, cy - 6.f}, label);
 }
 
-void drawBattlefield(sf::RenderTarget& t, const Assets& a, const MockState& s, const UiState& ui)
+void drawBattlefield(sf::RenderTarget& t, const Assets& a, const ViewState& s, const UiState& ui)
 {
     const R r = layout::battlefield;
     const layout::Grid& grid = s.grid;
@@ -269,8 +265,10 @@ void drawBattlefield(sf::RenderTarget& t, const Assets& a, const MockState& s, c
     for (int i : order)
     {
         const Character& c = s.characters[static_cast<std::size_t>(i)];
+        if (!c.onBattlefield)
+            continue;  // e.g. a corpse that has dissolved: still listed in the roster and HUD
         const R tile = grid.tileRect(c.tile);
-        if (!c.alive())
+        if (!c.alive)
         {
             drawImage(t, a.bonePile, tile.position, layout::artScale, C(200, 196, 186));
             continue;
@@ -293,7 +291,7 @@ void drawBattlefield(sf::RenderTarget& t, const Assets& a, const MockState& s, c
     }
 
     // Selection brackets (gold corners) around the selected character's tile.
-    if (ui.selected >= 0)
+    if (ui.selected >= 0 && s.characters[static_cast<std::size_t>(ui.selected)].onBattlefield)
     {
         const Character& c = s.characters[static_cast<std::size_t>(ui.selected)];
         const R tile = shrink(grid.tileRect(c.tile), -3.f);
@@ -312,11 +310,11 @@ void drawBattlefield(sf::RenderTarget& t, const Assets& a, const MockState& s, c
     }
 
     // Tooltip for a hovered character on the battlefield.
-    if (ui.hovered >= 0 && r.contains(ui.mouse))
+    if (ui.hovered >= 0 && r.contains(ui.mouse) && s.characters[static_cast<std::size_t>(ui.hovered)].onBattlefield)
     {
         const Character& c = s.characters[static_cast<std::size_t>(ui.hovered)];
         const std::string line1 = c.name + "  -  " + c.typeName;
-        const std::string line2 = c.alive() ? ("HP " + std::to_string(c.hp) + " / " + std::to_string(c.maxHp)) : "Defeated";
+        const std::string line2 = c.alive ? ("HP " + std::to_string(c.hp) + " / " + std::to_string(c.maxHp)) : "Defeated";
         const float w = std::max(textWidth(a.font, line1, 16), textWidth(a.font, line2, 15)) + 20.f;
         V p{ui.mouse.x + 16.f, ui.mouse.y + 14.f};
         p.x = std::min(p.x, r.position.x + r.size.x - w - 12.f);
@@ -327,11 +325,11 @@ void drawBattlefield(sf::RenderTarget& t, const Assets& a, const MockState& s, c
         fillRect(t, shrink(box, 2.f), C(26, 23, 20));
         fillRect(t, {{box.position.x + 2.f, box.position.y + 2.f}, {3.f, box.size.y - 4.f}}, c.accent);
         drawText(t, a.font, line1, {p.x + 11.f, p.y + 4.f}, 16, pal::text);
-        drawText(t, a.font, line2, {p.x + 11.f, p.y + 24.f}, 15, c.alive() ? pal::textDim : pal::red);
+        drawText(t, a.font, line2, {p.x + 11.f, p.y + 24.f}, 15, c.alive ? pal::textDim : pal::red);
     }
 }
 
-void drawHeroPanel(sf::RenderTarget& t, const Assets& a, const MockState& s, const UiState& ui)
+void drawHeroPanel(sf::RenderTarget& t, const Assets& a, const ViewState& s, const UiState& ui)
 {
     const R r = layout::heroPanel;
     const Character& hero = s.characters.front();
@@ -343,7 +341,7 @@ void drawHeroPanel(sf::RenderTarget& t, const Assets& a, const MockState& s, con
     pixelfont::draw(t, "HERO STATUS", {x, r.position.y + 16.f}, heading());
 
     // Level badge, top right.
-    const std::string lv = "LV " + std::to_string(s.hero.level);
+    const std::string lv = "LV " + std::to_string(s.heroLevel);
     const float bw = pixelfont::measure(lv, 2.f) + 16.f;
     const R badge{{r.position.x + r.size.x - 18.f - bw, r.position.y + 12.f}, {bw, 22.f}};
     fillRect(t, badge, pal::ink);
@@ -351,7 +349,7 @@ void drawHeroPanel(sf::RenderTarget& t, const Assets& a, const MockState& s, con
     outlineRect(t, shrink(badge, 1.f), pal::steel, 1.f);
     pixelfont::draw(t, lv, {badge.position.x + 8.f, badge.position.y + 4.f}, parchment());
 
-    drawText(t, a.font, hero.name + " the " + s.hero.title, {x, r.position.y + 36.f}, 22, C(244, 232, 204));
+    drawText(t, a.font, hero.name + " the " + s.heroTitle, {x, r.position.y + 36.f}, 22, C(244, 232, 204));
 
     const R bar{{x, r.position.y + 70.f}, {266.f, 18.f}};
     drawBar(t, bar, static_cast<float>(hero.hp) / static_cast<float>(hero.maxHp), pal::red);
@@ -360,20 +358,18 @@ void drawHeroPanel(sf::RenderTarget& t, const Assets& a, const MockState& s, con
 
     float lx = x;
     const float ly = r.position.y + 95.f;
-    lx += drawText(t, a.font, "Level " + std::to_string(s.hero.level), {lx, ly}, 16, pal::textDim) + 22.f;
-    lx += drawText(t, a.font, "Defeated " + std::to_string(s.hero.kills) + " / 4", {lx, ly}, 16, pal::textDim) + 22.f;
-    lx += drawText(t, a.font, "Last round:", {lx, ly}, 16, pal::textFaint) + 6.f;
-    lx += drawText(t, a.font, "-" + std::to_string(s.hero.lastDamage), {lx, ly}, 16, lighten(pal::red, 30)) + 8.f;
-    drawText(t, a.font, "+" + std::to_string(s.hero.lastHeal), {lx, ly}, 16, lighten(pal::green, 20));
+    const std::string monsters = std::to_string(s.characters.size() - 1);
+    lx += drawText(t, a.font, "Level " + std::to_string(s.heroLevel), {lx, ly}, 16, pal::textDim) + 22.f;
+    drawText(t, a.font, "Defeated " + std::to_string(s.monstersDefeated) + " / " + monsters, {lx, ly}, 16, pal::textDim);
 }
 
-void drawRosterPanel(sf::RenderTarget& t, const Assets& a, const MockState& s, const UiState& ui)
+void drawRosterPanel(sf::RenderTarget& t, const Assets& a, const ViewState& s, const UiState& ui)
 {
     const R r = layout::rosterPanel;
     drawFrame(t, a, r);
     pixelfont::draw(t, "MONSTERS", {r.position.x + 18.f, r.position.y + 16.f}, heading());
     const int alive = static_cast<int>(std::count_if(s.characters.begin() + 1, s.characters.end(),
-                                                     [](const Character& c) { return c.alive(); }));
+                                                     [](const Character& c) { return c.alive; }));
     const std::string remaining = std::to_string(alive) + " REMAIN";
     pixelfont::draw(t, remaining, {r.position.x + r.size.x - 18.f - pixelfont::measure(remaining, 2.f), r.position.y + 16.f},
                     {2.f, pal::textDim, lighten(pal::textDim, -16), true});
@@ -382,7 +378,7 @@ void drawRosterPanel(sf::RenderTarget& t, const Assets& a, const MockState& s, c
     {
         const Character& c = s.characters[static_cast<std::size_t>(i)];
         const R row = layout::rosterRow(i - 1);
-        const bool dead = !c.alive();
+        const bool dead = !c.alive;
         const bool sel = ui.selected == i, hov = ui.hovered == i;
 
         fillRect(t, row, sel ? C(62, 52, 36, 220) : (hov ? C(48, 44, 38, 200) : C(20, 19, 18, 150)));
@@ -449,7 +445,7 @@ private:
     sf::View saved;
 };
 
-void drawLogPanel(sf::RenderTarget& t, const Assets& a, const MockState& s, const UiState& ui)
+void drawLogPanel(sf::RenderTarget& t, const Assets& a, const ViewState& s, const UiState& ui)
 {
     const R r = layout::logPanel;
     const int total = static_cast<int>(s.log.size());
@@ -501,7 +497,7 @@ void drawLogPanel(sf::RenderTarget& t, const Assets& a, const MockState& s, cons
     fillRect(t, {{thumb.position.x, thumb.position.y + thumb.size.y - 1.f}, {thumb.size.x, 1.f}}, pal::woodDark);
 }
 
-void drawCommandBar(sf::RenderTarget& t, const Assets& a, const UiState& ui)
+void drawCommandBar(sf::RenderTarget& t, const Assets& a, const ViewState& s, const UiState& ui)
 {
     const R r = layout::commandBar;
     drawFrame(t, a, r);
@@ -518,12 +514,14 @@ void drawCommandBar(sf::RenderTarget& t, const Assets& a, const UiState& ui)
         px += pixelfont::measure(one, 3.f) + 9.f;
     }
     fillRect(t, {{px, cy - 10.f}, {12.f, 21.f}}, withAlpha(pal::goldBright, 170));  // block cursor
-    drawText(t, a.font, ui.pending.empty() ? "type a move" : "pending", {box.position.x + box.size.x + 10.f, cy - 10.f}, 15,
+    drawText(t, a.font, "command execution is not enabled yet", {box.position.x + box.size.x + 10.f, cy - 10.f}, 15,
              pal::textFaint);
 
-    struct Hint { std::vector<std::string> keys; std::string label; };
+    // Fight is always listed, muted while no living monster is adjacent (the Arena's canFight),
+    // so the hints never shift as its availability changes.
+    struct Hint { std::vector<std::string> keys; std::string label; bool enabled = true; };
     const std::vector<Hint> hints{{{"W", "A", "S", "D"}, "Move"}, {{"Enter"}, "Submit"}, {{"Backspace"}, "Edit"},
-                                  {{"R"}, "Rest"}, {{"Esc"}, "Exit"}};
+                                  {{"R"}, "Rest"}, {{"F"}, "Fight", s.canFight}, {{"Esc"}, "Exit"}};
     // Measure, then right-align.
     float total = 0.f;
     for (const auto& h : hints)
@@ -538,19 +536,19 @@ void drawCommandBar(sf::RenderTarget& t, const Assets& a, const UiState& ui)
         for (const auto& k : h.keys)
         {
             float w = 0.f;
-            drawKeyCap(t, a.font, k, {x, cy - 12.f}, w);
+            drawKeyCap(t, a.font, k, {x, cy - 12.f}, w, !h.enabled);
             x += w + 4.f;
         }
         x += 4.f;
-        x += drawText(t, a.font, h.label, {x, cy - 11.f}, 17, pal::text) + 26.f;
+        x += drawText(t, a.font, h.label, {x, cy - 11.f}, 17, h.enabled ? pal::text : pal::textFaint) + 26.f;
     }
 }
 
-void drawCard(sf::RenderTarget& t, const Assets& a, const MockState& s, const UiState& ui, int i)
+void drawCard(sf::RenderTarget& t, const Assets& a, const ViewState& s, const UiState& ui, int i)
 {
     const Character& c = s.characters[static_cast<std::size_t>(i)];
     const bool isHero = i == 0;
-    const bool dead = !c.alive();
+    const bool dead = !c.alive;
     const R r = layout::card(i);
 
     // Card body.
@@ -590,7 +588,7 @@ void drawCard(sf::RenderTarget& t, const Assets& a, const MockState& s, const Ui
     const pixelfont::Style nameStyle = dead ? pixelfont::Style{3.f, C(140, 132, 116), C(112, 104, 90), true}
                                             : (isHero ? pixelfont::Style{3.f, C(200, 226, 244), pal::steel, true} : parchment(3.f));
     pixelfont::draw(t, c.name, {x, r.position.y + 22.f}, nameStyle);
-    const std::string type = isHero ? (s.hero.title + "  |  Level " + std::to_string(s.hero.level)) : c.typeName;
+    const std::string type = isHero ? (s.heroTitle + "  |  Level " + std::to_string(s.heroLevel)) : c.typeName;
     drawText(t, a.font, type, {x, r.position.y + 50.f}, 17, dead ? pal::textFaint : lighten(c.accent, 20));
 
     drawText(t, a.font, "HP", {x, r.position.y + 78.f}, 14, pal::textDim);
@@ -616,18 +614,22 @@ void drawCard(sf::RenderTarget& t, const Assets& a, const MockState& s, const Ui
         outlineRect(t, shrink(r, -2.f), withAlpha(pal::text, 160), 1.f);
 }
 
-void drawPortraitHud(sf::RenderTarget& t, const Assets& a, const MockState& s, const UiState& ui)
+void drawPortraitHud(sf::RenderTarget& t, const Assets& a, const ViewState& s, const UiState& ui)
 {
     drawFrame(t, a, layout::portraitHud);
     for (int i = 0; i < static_cast<int>(s.characters.size()) && i < 5; ++i)
         drawCard(t, a, s, ui, i);
 }
 
-void drawStatusLine(sf::RenderTarget& t, const Assets& a)
+void drawStatusLine(sf::RenderTarget& t, const Assets& a, const ViewState& s)
 {
-    drawText(t, a.font, "MOCKUP v1.0  -  static sample data, not connected to the BattleArena model",
-             {24.f, layout::statusLineY}, 14, pal::textFaint, false);
-    const std::string right = "Hover to highlight  |  Click to inspect  |  Wheel scrolls the log  |  W A S D R  Enter  Backspace  Esc";
+    if (s.visualTest.empty())
+        drawText(t, a.font, "Live Arena state  -  read-only view, turns are not enabled yet",
+                 {24.f, layout::statusLineY}, 14, pal::textFaint, false);
+    else
+        drawText(t, a.font, "VISUAL TEST  -  " + s.visualTest + "  -  not the live Arena",
+                 {24.f, layout::statusLineY}, 14, pal::gold, false);
+    const std::string right = "Hover to highlight  |  Click to inspect  |  Wheel scrolls the log  |  W A S D R F  Enter  Backspace  Esc";
     drawText(t, a.font, right, {1576.f - textWidth(a.font, right, 14), layout::statusLineY}, 14, pal::textFaint, false);
 }
 } // namespace
@@ -690,7 +692,7 @@ bool Assets::load(const std::filesystem::path& exeDir, const layout::Grid& grid)
     return ok;
 }
 
-void drawScene(sf::RenderTarget& target, const Assets& assets, const MockState& state, const UiState& ui)
+void drawScene(sf::RenderTarget& target, const Assets& assets, const ViewState& state, const UiState& ui)
 {
     target.clear(pal::background);
     drawTitleBar(target, assets, state);
@@ -698,22 +700,23 @@ void drawScene(sf::RenderTarget& target, const Assets& assets, const MockState& 
     drawHeroPanel(target, assets, state, ui);
     drawRosterPanel(target, assets, state, ui);
     drawLogPanel(target, assets, state, ui);
-    drawCommandBar(target, assets, ui);
+    drawCommandBar(target, assets, state, ui);
     drawPortraitHud(target, assets, state, ui);
-    drawStatusLine(target, assets);
+    drawStatusLine(target, assets, state);
 }
 
-std::optional<sf::Vector2i> tileAt(sf::Vector2f p, const MockState& state)
+std::optional<sf::Vector2i> tileAt(sf::Vector2f p, const ViewState& state)
 {
     return state.grid.tileAt(p);
 }
 
-int characterAt(sf::Vector2f p, const MockState& state)
+int characterAt(sf::Vector2f p, const ViewState& state)
 {
     const int n = static_cast<int>(state.characters.size());
     if (const auto tile = state.grid.tileAt(p))
         for (int i = 0; i < n; ++i)
-            if (state.characters[static_cast<std::size_t>(i)].tile == *tile)
+            if (state.characters[static_cast<std::size_t>(i)].onBattlefield &&
+                state.characters[static_cast<std::size_t>(i)].tile == *tile)
                 return i;
     for (int i = 0; i < n && i < 5; ++i)
         if (layout::card(i).contains(p))

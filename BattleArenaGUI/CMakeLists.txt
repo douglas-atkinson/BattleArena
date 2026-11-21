@@ -1,5 +1,5 @@
-# BattleArena graphical interface (transplanted from the BattleArenaMockup project;
-# still uses placeholder data and is not yet connected to the game model).
+# BattleArena graphical interface. It displays the real game model, compiled from
+# ../BattleArena (shared with the console project, not copied) as the BattleArenaCore library.
 # Based on the official SFML CMake template: https://github.com/SFML/cmake-sfml-project
 cmake_minimum_required(VERSION 3.28)
 project(BattleArenaGUI LANGUAGES CXX)
@@ -18,6 +18,27 @@ set(SFML_BUILD_AUDIO OFF CACHE BOOL "" FORCE)
 set(SFML_BUILD_NETWORK OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(SFML)
 
+# The game model: everything in ../BattleArena except the console's main.cpp. No SFML.
+set(MODEL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../BattleArena)
+add_library(BattleArenaCore STATIC
+    ${MODEL_DIR}/arena.cpp
+    ${MODEL_DIR}/bat.cpp
+    ${MODEL_DIR}/battlefactory.cpp
+    ${MODEL_DIR}/combatant.cpp
+    ${MODEL_DIR}/goblin.cpp
+    ${MODEL_DIR}/hero.cpp
+    ${MODEL_DIR}/herotitle.cpp
+    ${MODEL_DIR}/monster.cpp
+    ${MODEL_DIR}/ogre.cpp
+    ${MODEL_DIR}/random.cpp
+    ${MODEL_DIR}/skeleton.cpp
+    ${MODEL_DIR}/worldstate.cpp)
+target_include_directories(BattleArenaCore PUBLIC ${MODEL_DIR})
+target_compile_features(BattleArenaCore PUBLIC cxx_std_20)
+if(MSVC)
+    target_compile_options(BattleArenaCore PRIVATE /W4 /permissive-)
+endif()
+
 add_executable(BattleArenaGUI
     src/main.cpp
     src/Art.cpp
@@ -28,9 +49,9 @@ add_executable(BattleArenaGUI
     src/Renderer.hpp
     src/Layout.hpp
     src/LogScroll.hpp
-    src/MockData.hpp)
+    src/ViewState.hpp)
 target_compile_features(BattleArenaGUI PRIVATE cxx_std_20)
-target_link_libraries(BattleArenaGUI PRIVATE SFML::Graphics)
+target_link_libraries(BattleArenaGUI PRIVATE BattleArenaCore SFML::Graphics)
 
 if(MSVC)
     target_compile_options(BattleArenaGUI PRIVATE /W4 /permissive- /utf-8)

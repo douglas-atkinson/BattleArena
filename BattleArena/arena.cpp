@@ -21,7 +21,7 @@ namespace {
     // before characters, so an over-long command was rejected for exceeding speed.
     std::string describeInvalidCommand(const std::string& command, int speed) {
         if (command.empty()) {
-            return "Enter a command: W/A/S/D to move, R to rest.";
+            return "Enter a command: W/A/S/D to move, R to rest, or F to fight.";
         }
         if (command.size() > static_cast<std::size_t>(speed)) {
             return "Movement command exceeds hero speed (maximum " + std::to_string(speed) + ").";
@@ -401,7 +401,6 @@ void Arena::validateMonsterPositions() const {
             throw std::invalid_argument("Monster's position must be within Arena boundaries");
         }
     }
-
 }
 
 void Arena::validateNoOverlappingCombatants() const {

@@ -1,10 +1,10 @@
 #pragma once
 
-// Presentation layer for the mockup. Reads MockState, never modifies it.
+// Presentation layer. Reads ViewState, never modifies it.
 
 #include "Art.hpp"
 #include "Layout.hpp"
-#include "MockData.hpp"
+#include "ViewState.hpp"
 
 #include <SFML/Graphics/Font.hpp>
 #include <SFML/Graphics/RenderTarget.hpp>
@@ -45,15 +45,15 @@ struct UiState
     int hovered = -1;                       // character index under the mouse
     int selected = -1;                      // character index clicked
     std::optional<sf::Vector2i> hoveredTile;
-    std::string pending = "WA";             // unsubmitted movement command
+    std::string pending;                    // typed command (not executed yet)
     int logScroll = 0;                      // lines scrolled up from the newest entry
     bool draggingLogThumb = false;          // left button held on the log scrollbar thumb
     float logThumbGrabOffset = 0.f;         // mouse y minus thumb top when the drag began
 };
 
-void drawScene(sf::RenderTarget& target, const Assets& assets, const MockState& state, const UiState& ui);
+void drawScene(sf::RenderTarget& target, const Assets& assets, const ViewState& state, const UiState& ui);
 
 // Hit testing in view coordinates.
-int characterAt(sf::Vector2f point, const MockState& state);
-std::optional<sf::Vector2i> tileAt(sf::Vector2f point, const MockState& state);
+int characterAt(sf::Vector2f point, const ViewState& state);
+std::optional<sf::Vector2i> tileAt(sf::Vector2f point, const ViewState& state);
 bool isOverLog(sf::Vector2f point);

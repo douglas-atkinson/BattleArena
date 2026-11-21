@@ -42,7 +42,7 @@ public:
     char getSymbol() const;
     const Position& getPosition() const;
     void setPosition(const Position& newPosition);
-    void setSymbol(const char symbol);
+    void setSymbol(const char newSymbol);
     const std::array<std::string, 6>& getPortrait() const;
 
 protected:

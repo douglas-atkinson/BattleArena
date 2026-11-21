@@ -1,20 +1,23 @@
-// BattleArena graphical interface mockup.
+// BattleArena graphical interface.
 //
-// A standalone SFML 3.1 application that demonstrates the proposed layout using
-// hardcoded sample data. It is intentionally NOT connected to the game model.
+// Builds the real demonstration Arena and draws its snapshot. This phase is a read-only
+// view: the GUI never calls previewCommand() or submitCommand(), so no turn can happen.
 //
 // Command-line options (handy for reviews and documentation):
 //   --screenshot <file.png>   render one frame to an image and exit
 //   --select <index>          start with a character selected (0 = hero, 1-4 = monsters)
 //   --hover <x> <y>           simulate the mouse at a view position (with --screenshot)
 //   --log-scroll <lines>      start with the combat log scrolled up (clamped)
-//   --log-entries <n>         keep only the n newest sample log entries
-//   --grid <cols>x<rows>      battlefield size for presentation tests (default 30x16)
+// Visual test mode (labelled on screen as "VISUAL TEST", never the live game):
+//   --test-grid <cols>x<rows> show the characters on another grid size (positions rescaled)
+//   --test-log <n>            add n placeholder log lines to exercise the log scrollbar
 
 #include "Layout.hpp"
 #include "LogScroll.hpp"
-#include "MockData.hpp"
 #include "Renderer.hpp"
+#include "ViewState.hpp"
+
+#include "battlefactory.h"
 
 #include <SFML/Graphics.hpp>
 
@@ -72,19 +75,20 @@ std::optional<layout::Grid> parseGrid(const std::string& text)
     return grid;
 }
 
-logscroll::Geometry logGeometry(const MockState& state, const UiState& ui)
+logscroll::Geometry logGeometry(const ViewState& state, const UiState& ui)
 {
     return logscroll::geometry(static_cast<int>(state.log.size()), ui.logScroll);
 }
 
-void updateHover(UiState& ui, const MockState& state, sf::Vector2f mouse)
+void updateHover(UiState& ui, const ViewState& state, sf::Vector2f mouse)
 {
     ui.mouse = mouse;
     ui.hovered = characterAt(mouse, state);
     ui.hoveredTile = tileAt(mouse, state);
 }
 
-void handleKey(sf::Keyboard::Key key, UiState& ui, MockState& state, sf::RenderWindow& window)
+// Typing only edits the command box; nothing is sent to the Arena yet.
+void handleKey(sf::Keyboard::Key key, UiState& ui, sf::RenderWindow& window)
 {
     using K = sf::Keyboard::Key;
     constexpr std::size_t maxPending = 8;
@@ -103,17 +107,6 @@ void handleKey(sf::Keyboard::Key key, UiState& ui, MockState& state, sf::RenderW
         if (!ui.pending.empty())
             ui.pending.pop_back();
         break;
-    case K::Enter:
-        if (!ui.pending.empty())
-        {
-            // Mockup only: echo the command; validation and movement belong to the model (Arena).
-            const std::string what = ui.pending == "R" ? "Bob rests (mockup: no game logic)."
-                                                       : "Command " + ui.pending + " submitted (mockup: no game logic).";
-            state.log.push_back({state.round, what, LogKind::System});
-            ui.pending.clear();
-            ui.logScroll = 0;
-        }
-        break;
     case K::Escape: window.close(); break;
     default: break;
     }
@@ -123,9 +116,9 @@ void handleKey(sf::Keyboard::Key key, UiState& ui, MockState& state, sf::RenderW
 int main(int argc, char** argv)
 {
     std::optional<std::string> screenshotPath;
-    std::optional<int> logEntries;
+    std::optional<layout::Grid> testGrid;
+    int testLogLines = 0;
     UiState ui;
-    layout::Grid grid;
     for (int i = 1; i < argc; ++i)
     {
         const std::string arg = argv[i];
@@ -140,15 +133,15 @@ int main(int argc, char** argv)
         }
         else if (arg == "--log-scroll" && i + 1 < argc)
             ui.logScroll = std::stoi(argv[++i]);
-        else if (arg == "--log-entries" && i + 1 < argc)
-            logEntries = std::stoi(argv[++i]);
-        else if (arg == "--grid" && i + 1 < argc)
+        else if (arg == "--test-log" && i + 1 < argc)
+            testLogLines = std::max(0, std::stoi(argv[++i]));
+        else if (arg == "--test-grid" && i + 1 < argc)
         {
             const std::string text = argv[++i];
             const std::optional<layout::Grid> parsed = parseGrid(text);
             if (!parsed)
             {
-                std::cerr << "Invalid --grid value '" << text << "'. Use <cols>x<rows>, for example 10x10.\n";
+                std::cerr << "Invalid --test-grid value '" << text << "'. Use <cols>x<rows>, for example 10x10.\n";
                 return 2;
             }
             if (!layout::Grid::supports(parsed->cols, parsed->rows))
@@ -158,19 +151,40 @@ int main(int argc, char** argv)
                           << layout::Grid::minRows << "-" << layout::Grid::maxRows << ".\n";
                 return 2;
             }
-            grid = *parsed;
+            testGrid = *parsed;
         }
     }
 
     const std::filesystem::path exeDir =
         argc > 0 ? std::filesystem::absolute(argv[0]).parent_path() : std::filesystem::current_path();
+
+    // The Arena owns the game state; the GUI only draws copies taken from its snapshot.
+    Arena arena = createDefaultArena();
+    ViewState state = makeViewState(arena.getSnapshot());
+    if (!layout::Grid::supports(state.grid.cols, state.grid.rows))
+    {
+        std::cerr << "The Arena's " << state.grid.cols << "x" << state.grid.rows
+                  << " battlefield does not fit the battlefield panel.\n";
+        return 1;
+    }
+    state.log.push_back({state.round, "The battle begins!", LogKind::System});
+
+    if (testGrid)
+    {
+        applyTestGrid(state, *testGrid);
+        state.visualTest = std::to_string(testGrid->cols) + "x" + std::to_string(testGrid->rows) + " grid";
+    }
+    if (testLogLines > 0)
+    {
+        for (int n = 1; n <= testLogLines; ++n)
+            state.log.push_back({state.round, "Placeholder log line " + std::to_string(n) + ".", LogKind::Info});
+        state.visualTest += (state.visualTest.empty() ? "" : ", ") + std::to_string(testLogLines) + " placeholder log lines";
+    }
+
     Assets assets;
-    if (!assets.load(exeDir, grid))
+    if (!assets.load(exeDir, state.grid))
         return 1;
 
-    MockState state = makeSampleState(grid);
-    if (logEntries && *logEntries >= 0 && static_cast<std::size_t>(*logEntries) < state.log.size())
-        state.log.erase(state.log.begin(), state.log.end() - *logEntries);
     ui.logScroll = logscroll::clampScroll(ui.logScroll, static_cast<int>(state.log.size()));
     ui.selected = std::clamp(ui.selected, -1, static_cast<int>(state.characters.size()) - 1);
     if (ui.mouse.x >= 0.f)
@@ -205,7 +219,7 @@ int main(int argc, char** argv)
             else if (const auto* resized = event->getIf<sf::Event::Resized>())
                 window.setView(makeView(resized->size));
             else if (const auto* key = event->getIf<sf::Event::KeyPressed>())
-                handleKey(key->code, ui, state, window);
+                handleKey(key->code, ui, window);
             else if (const auto* moved = event->getIf<sf::Event::MouseMoved>())
             {
                 const sf::Vector2f p = window.mapPixelToCoords(moved->position);

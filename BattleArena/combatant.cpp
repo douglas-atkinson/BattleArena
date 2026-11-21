@@ -92,8 +92,8 @@ void Combatant::setPosition(const Position& newPosition) {
     position = newPosition;
 }
 
-void Combatant::setSymbol(const char symbol) {
-    this->symbol = symbol;
+void Combatant::setSymbol(const char newSymbol) {
+    symbol = newSymbol;
 }
 
 const std::array<std::string, 6>& Combatant::getPortrait() const {

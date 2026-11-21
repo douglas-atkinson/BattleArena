@@ -131,6 +131,7 @@
     <ClInclude Include="arenatypes.h" />
     <ClInclude Include="attackresult.h" />
     <ClInclude Include="bat.h" />
+    <ClInclude Include="battlefactory.h" />
     <ClInclude Include="combatant.h" />
     <ClInclude Include="dummymonster.h" />
     <ClInclude Include="goblin.h" />
@@ -147,6 +148,7 @@
   <ItemGroup>
     <ClCompile Include="arena.cpp" />
     <ClCompile Include="bat.cpp" />
+    <ClCompile Include="battlefactory.cpp" />
     <ClCompile Include="combatant.cpp" />
     <ClCompile Include="dummymonster.cpp" />
     <ClCompile Include="goblin.cpp" />
