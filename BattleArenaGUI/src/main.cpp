@@ -1,8 +1,9 @@
 // BattleArena graphical interface.
 //
 // Builds the real demonstration Arena and draws its snapshot. Typed commands are checked
-// with Arena::previewCommand(), which changes nothing; submitCommand() is never called,
-// so no turn can happen yet.
+// with Arena::previewCommand(), which changes nothing; Enter sends the command to
+// Arena::submitCommand(), which plays one complete round. The GUI never applies game
+// rules itself: everything it shows comes from the Arena's snapshots and messages.
 //
 // Command-line options (handy for reviews and documentation):
 //   --screenshot <file.png>   render one frame to an image and exit
@@ -10,7 +11,7 @@
 //   --hover <x> <y>           simulate the mouse at a view position (with --screenshot)
 //   --log-scroll <lines>      start with the combat log scrolled up (clamped)
 //   --preview <command>       start with a pending command and its live preview (never submitted)
-// Visual test mode (labelled on screen as "VISUAL TEST", never the live game):
+// Visual test mode (labelled on screen as "VISUAL TEST", never the live game; turns are disabled):
 //   --test-grid <cols>x<rows> show the characters on another grid size (positions rescaled)
 //   --test-log <n>            add n placeholder log lines to exercise the log scrollbar
 
@@ -95,9 +96,16 @@ void updateHover(UiState& ui, const ViewState& state, sf::Vector2f mouse)
 // characters are kept so the Arena can reject commands longer than the hero's speed.
 constexpr std::size_t maxPending = 8;  // what the command box can show
 
-bool handleKey(sf::Keyboard::Key key, UiState& ui, sf::RenderWindow& window)
+bool handleKey(sf::Keyboard::Key key, UiState& ui, bool battleOver, sf::RenderWindow& window)
 {
     using K = sf::Keyboard::Key;
+    if (key == K::Escape)
+    {
+        window.close();
+        return false;
+    }
+    if (battleOver)
+        return false;  // the battle has ended: no more commands
     const std::string before = ui.pending;
     auto move = [&](char c) {
         if (ui.pending == "R" || ui.pending == "F")
@@ -117,14 +125,9 @@ bool handleKey(sf::Keyboard::Key key, UiState& ui, sf::RenderWindow& window)
         if (!ui.pending.empty())
             ui.pending.pop_back();
         break;
-    case K::Enter: ui.submitNotice = true; break;  // not enabled yet: nothing is submitted
-    case K::Escape: window.close(); break;
     default: break;
     }
-    if (ui.pending == before)
-        return false;
-    ui.submitNotice = false;
-    return true;
+    return ui.pending != before;
 }
 
 // Asks the Arena about the pending command and stores what the renderer should show.
@@ -142,6 +145,40 @@ void updatePreview(ViewState& state, const Arena& arena, const std::string& pend
         return;
     }
     state.preview = makeCommandPreviewView(arena.previewCommand(pending), state.characters.front().tile);
+}
+
+// Enter: sends the pending command to the Arena, which validates it and, if it is legal,
+// plays one complete round. A rejected command changes nothing and stays in the box for
+// correction; an accepted one refreshes the whole view from the returned snapshot.
+void submitPending(Arena& arena, ViewState& state, UiState& ui)
+{
+    if (state.battleOver)
+        return;
+    if (!state.visualTest.empty())
+    {
+        state.preview = {"Turns are disabled in visual test mode", FeedbackTone::Neutral, std::nullopt};
+        return;
+    }
+    if (ui.pending.empty())
+    {
+        state.preview = {"Type a command, then press Enter", FeedbackTone::Neutral, std::nullopt};
+        return;
+    }
+
+    const TurnResult result = arena.submitCommand(ui.pending);
+    if (!result.accepted)
+    {
+        state.preview = {result.messages.empty() ? "Command rejected." : result.messages.front(),
+                         FeedbackTone::Invalid, std::nullopt};
+        return;
+    }
+
+    const int added = applyTurnResult(state, result);
+    if (ui.logScroll > 0)  // the reader had scrolled up: keep the same lines in view
+        ui.logScroll = logscroll::clampScroll(ui.logScroll + added, static_cast<int>(state.log.size()));
+    ui.pending.clear();
+    updatePreview(state, arena, ui.pending, true);
+    updateHover(ui, state, ui.mouse);  // characters may have moved under the mouse
 }
 } // namespace
 
@@ -251,6 +288,7 @@ int main(int argc, char** argv)
     window.setView(makeView(window.getSize()));
 
     float wheelRemainder = 0.f;
+    bool enterHeld = false;
     while (window.isOpen())
     {
         while (const std::optional event = window.pollEvent())
@@ -261,8 +299,24 @@ int main(int argc, char** argv)
                 window.setView(makeView(resized->size));
             else if (const auto* key = event->getIf<sf::Event::KeyPressed>())
             {
-                if (handleKey(key->code, ui, window))
+                if (key->code == sf::Keyboard::Key::Enter)
+                {
+                    // One submission per physical press: key-repeat events are ignored.
+                    if (!enterHeld)
+                    {
+                        submitPending(arena, state, ui);
+                        if (!assets.prepareBattlefield(state.grid))  // no-op while the grid is unchanged
+                            return 1;
+                    }
+                    enterHeld = true;
+                }
+                else if (handleKey(key->code, ui, state.battleOver, window))
                     updatePreview(state, arena, ui.pending, !testGrid);
+            }
+            else if (const auto* keyUp = event->getIf<sf::Event::KeyReleased>())
+            {
+                if (keyUp->code == sf::Keyboard::Key::Enter)
+                    enterHeld = false;
             }
             else if (const auto* moved = event->getIf<sf::Event::MouseMoved>())
             {
@@ -280,7 +334,10 @@ int main(int argc, char** argv)
             else if (event->is<sf::Event::MouseLeft>())
                 updateHover(ui, state, {-1.f, -1.f});  // a drag in progress continues; release ends it
             else if (event->is<sf::Event::FocusLost>())
+            {
                 ui.draggingLogThumb = false;
+                enterHeld = false;
+            }
             else if (const auto* click = event->getIf<sf::Event::MouseButtonPressed>())
             {
                 if (click->button == sf::Mouse::Button::Left)

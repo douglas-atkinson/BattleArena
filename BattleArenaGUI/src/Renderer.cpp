@@ -481,7 +481,7 @@ void drawLogPanel(sf::RenderTarget& t, const Assets& a, const ViewState& s, cons
     {
         const LogEntry& e = s.log[static_cast<std::size_t>(i)];
         const bool newest = i == total - 1;
-        if (e.round == s.round)
+        if (e.round == s.log.back().round)  // the most recent round in the log
             fillRect(t, {{area.position.x + 2.f, y - 1.f}, {area.size.x - 18.f, layout::logLineHeight - 1.f}}, C(255, 220, 160, newest ? 18 : 9));
         drawText(t, a.font, "R" + std::to_string(e.round), {area.position.x + 8.f, y}, 14, pal::textFaint, false);
         std::string msg = e.text;
@@ -526,11 +526,15 @@ void drawCommandBar(sf::RenderTarget& t, const Assets& a, const ViewState& s, co
     }
     fillRect(t, {{px, cy - 10.f}, {12.f, 21.f}}, withAlpha(pal::goldBright, 170));  // block cursor
 
-    // Fight is always listed, muted while no living monster is adjacent (the Arena's canFight),
-    // so the hints never shift as its availability changes. Submitting is not enabled yet.
+    // Every hint is always listed, so nothing shifts; unavailable ones are muted. Fight follows
+    // the Arena's canFight, Submit follows the Arena's preview of the pending command, and
+    // after the battle (or in a visual test, for Submit) only Esc remains.
+    const bool playing = !s.battleOver;
+    const bool canSubmit = playing && s.visualTest.empty() && s.preview.tone == FeedbackTone::Valid;
     struct Hint { std::vector<std::string> keys; std::string label; bool enabled = true; };
-    const std::vector<Hint> hints{{{"W", "A", "S", "D"}, "Move"}, {{"Enter"}, "Submit", false}, {{"Backspace"}, "Edit"},
-                                  {{"R"}, "Rest"}, {{"F"}, "Fight", s.canFight}, {{"Esc"}, "Exit"}};
+    const std::vector<Hint> hints{{{"W", "A", "S", "D"}, "Move", playing}, {{"Enter"}, "Submit", canSubmit},
+                                  {{"Backspace"}, "Edit", playing}, {{"R"}, "Rest", playing},
+                                  {{"F"}, "Fight", playing && s.canFight}, {{"Esc"}, "Exit"}};
     // Measure, then right-align.
     float total = 0.f;
     for (const auto& h : hints)
@@ -545,10 +549,10 @@ void drawCommandBar(sf::RenderTarget& t, const Assets& a, const ViewState& s, co
     // little, then are shortened, so they never run into the hints.
     std::string feedback = "Enter a command";
     C color = pal::textFaint;
-    if (ui.submitNotice)
+    if (s.battleOver)
     {
-        feedback = "Submitting turns is not enabled yet";
-        color = pal::gold;
+        feedback = s.heroWon ? "Victory! The battle is won." : "Defeat. The battle is lost.";
+        color = s.heroWon ? pal::goldBright : lighten(pal::red, 30);
     }
     else if (!s.preview.feedback.empty())
     {
@@ -662,8 +666,11 @@ void drawPortraitHud(sf::RenderTarget& t, const Assets& a, const ViewState& s, c
 
 void drawStatusLine(sf::RenderTarget& t, const Assets& a, const ViewState& s)
 {
-    if (s.visualTest.empty())
-        drawText(t, a.font, "Live Arena state  -  read-only view, turns are not enabled yet",
+    if (s.battleOver)
+        drawText(t, a.font, s.heroWon ? "VICTORY  -  every monster is defeated" : "DEFEAT  -  the hero has fallen",
+                 {24.f, layout::statusLineY}, 14, s.heroWon ? pal::goldBright : lighten(pal::red, 30), false);
+    else if (s.visualTest.empty())
+        drawText(t, a.font, "Live Arena  -  type a command and press Enter to play a round",
                  {24.f, layout::statusLineY}, 14, pal::textFaint, false);
     else
         drawText(t, a.font, "VISUAL TEST  -  " + s.visualTest + "  -  not the live Arena",

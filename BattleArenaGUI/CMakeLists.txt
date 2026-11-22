@@ -73,6 +73,15 @@ if(MSVC)
 endif()
 add_test(NAME LogScrollTests COMMAND LogScrollTests)
 
+# Turn-flow tests: the real Arena plays rounds and the GUI's view is refreshed from each result.
+add_executable(TurnFlowTests tests/turn_flow_tests.cpp)
+target_include_directories(TurnFlowTests PRIVATE src)
+target_link_libraries(TurnFlowTests PRIVATE BattleArenaCore SFML::Graphics)
+if(MSVC)
+    target_compile_options(TurnFlowTests PRIVATE /W4 /permissive-)
+endif()
+add_test(NAME TurnFlowTests COMMAND TurnFlowTests)
+
 set_target_properties(BattleArenaGUI PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:BattleArenaGUI>)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT BattleArenaGUI)

@@ -58,6 +58,8 @@ struct ViewState
     std::string heroTitle;
     int monstersDefeated = 0;
     bool canFight = false;
+    bool battleOver = false;            // straight from ArenaSnapshot: the GUI never decides the outcome
+    bool heroWon = false;
     layout::Grid grid;
     std::vector<Character> characters;  // index 0 is the hero, then monsters in ID order
     std::vector<LogEntry> log;          // oldest first
@@ -113,6 +115,8 @@ inline ViewState makeViewState(const ArenaSnapshot& snapshot)
     v.heroTitle = snapshot.heroTitle;
     v.monstersDefeated = snapshot.monstersDefeated;
     v.canFight = snapshot.canFight;
+    v.battleOver = snapshot.battleOver;
+    v.heroWon = snapshot.heroWon;
     v.grid = layout::Grid{snapshot.cols, snapshot.rows};
     v.characters.push_back(toCharacter(snapshot.hero, snapshot.heroTitle, art::Kind::Knight));
     for (const CombatantSnapshot& monster : snapshot.monsters)
@@ -176,4 +180,42 @@ inline CommandPreviewView makeCommandPreviewView(const CommandPreview& preview, 
         break;
     }
     return view;
+}
+
+// Colour category for a message from the Arena. Purely cosmetic: it reads the model's
+// wording but never changes it, and anything unrecognised is shown as ordinary Info.
+inline LogKind classifyLogMessage(const std::string& text, const std::string& heroName)
+{
+    auto has = [&](const char* part) { return text.find(part) != std::string::npos; };
+    auto endsWith = [&](const std::string& tail) {
+        return text.size() >= tail.size() && text.compare(text.size() - tail.size(), tail.size(), tail) == 0;
+    };
+    if (has(" is victorious!") || has(" reaches level ") || has("'s maximum HP rises"))
+        return LogKind::Victory;
+    if (has(" has fallen.") || text == heroName + " is defeated!")
+        return LogKind::Damage;
+    if (endsWith(" is defeated!"))
+        return LogKind::Victory;
+    if (text.rfind("Hit! ", 0) == 0)
+        return LogKind::Damage;
+    if (has(" recovers ") && endsWith(" HP."))
+        return LogKind::Heal;
+    if (endsWith("...") || text.rfind("The smash ", 0) == 0 || text.rfind("The sting ", 0) == 0)
+        return LogKind::Special;  // special-attack wind-ups and their outcomes
+    return LogKind::Info;
+}
+
+// Applies an accepted turn: the returned snapshot replaces every displayed game value,
+// the existing log is kept, and the round's messages are appended in order, tagged with
+// the round that just finished. Returns how many log lines were added.
+inline int applyTurnResult(ViewState& v, const TurnResult& result)
+{
+    ViewState updated = makeViewState(result.state);
+    updated.log = std::move(v.log);
+    updated.visualTest = v.visualTest;
+    const int round = result.state.roundsCompleted;
+    for (const std::string& message : result.messages)
+        updated.log.push_back({round, message, classifyLogMessage(message, result.state.hero.name)});
+    v = std::move(updated);
+    return static_cast<int>(result.messages.size());
 }
