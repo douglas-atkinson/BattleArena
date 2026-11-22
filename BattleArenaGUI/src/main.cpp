@@ -23,6 +23,7 @@
 #include "battlefactory.h"
 
 #include <SFML/Graphics.hpp>
+#include <SFML/System/Clock.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -289,6 +290,8 @@ int main(int argc, char** argv)
 
     float wheelRemainder = 0.f;
     bool enterHeld = false;
+    sf::Clock victoryClock;
+    bool victoryStarted = false;
     while (window.isOpen())
     {
         while (const std::optional event = window.pollEvent())
@@ -380,6 +383,15 @@ int main(int argc, char** argv)
                 }
             }
         }
+
+        // Trigger the presentation effect only when the model reports victory.
+        if (state.battleOver && state.heroWon && !victoryStarted)
+        {
+            victoryClock.restart();
+            victoryStarted = true;
+        }
+        if (victoryStarted)
+            ui.victoryElapsedSeconds = victoryClock.getElapsedTime().asSeconds();
 
         drawScene(window, assets, state, ui);
         window.display();

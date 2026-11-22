@@ -49,6 +49,7 @@ struct UiState
     int logScroll = 0;                      // lines scrolled up from the newest entry
     bool draggingLogThumb = false;          // left button held on the log scrollbar thumb
     float logThumbGrabOffset = 0.f;         // mouse y minus thumb top when the drag began
+    float victoryElapsedSeconds = 1.4f;    // fully visible for static views; timed in live play
 };
 
 void drawScene(sf::RenderTarget& target, const Assets& assets, const ViewState& state, const UiState& ui);

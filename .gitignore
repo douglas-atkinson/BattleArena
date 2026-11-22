@@ -365,3 +365,6 @@ FodyWeavers.xsd
 # CMake build trees for the unified root workspace (out/ is already ignored above)
 /build/
 CMakeUserPresets.json
+
+# Local project notes and working documents
+/notes/

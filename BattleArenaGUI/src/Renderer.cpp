@@ -340,6 +340,80 @@ void drawBattlefield(sf::RenderTarget& t, const Assets& a, const ViewState& s, c
     }
 }
 
+// Presentation-only celebration: the Arena owns the result, and the hero's current
+// name supplies the wording. No portrait or specific character artwork is assumed.
+void drawVictoryBanner(sf::RenderTarget& t, const Assets& a, const ViewState& s, float elapsedSeconds)
+{
+    if (!s.battleOver || !s.heroWon)
+        return;
+
+    // Smoothstep easing prevents the fade from starting or stopping abruptly.
+    const auto fadeProgress = [elapsedSeconds](float start, float duration)
+    {
+        const float progress = std::clamp((elapsedSeconds - start) / duration, 0.f, 1.f);
+        return progress * progress * (3.f - 2.f * progress);
+    }; 
+    constexpr float heroFadeSeconds = 1.4f;
+    constexpr float punchlineDelaySeconds = 1.6f;
+    constexpr float punchlineFadeSeconds = 0.8f;
+    const float entranceOpacity = fadeProgress(0.f, heroFadeSeconds);
+    const float punchlineOpacity = fadeProgress(punchlineDelaySeconds, punchlineFadeSeconds);
+    const auto faded = [](C color, float opacity)
+    {
+        color.a = static_cast<std::uint8_t>(std::lround(static_cast<float>(color.a) * opacity));
+        return color;
+    };
+
+    const R field = layout::battlefield;
+    fillRect(t, shrink(field, 10.f), faded(C(7, 5, 4, 125), entranceOpacity));
+
+    const R banner{{field.position.x + (field.size.x - 872.f) / 2.f,
+                    field.position.y + (field.size.y - 238.f) / 2.f},
+                   {872.f, 238.f}};
+    const float cx = banner.position.x + banner.size.x / 2.f;
+
+    // Deep burgundy parchment, shadow, and gold inlays.
+    fillRect(t, {{banner.position.x + 7.f, banner.position.y + 8.f}, banner.size}, faded(C(0, 0, 0, 160), entranceOpacity));
+    fillRect(t, banner, faded(C(10, 8, 7, 245), entranceOpacity));
+    fillRect(t, shrink(banner, 4.f), faded(C(54, 32, 27, 248), entranceOpacity));
+    outlineRect(t, shrink(banner, 8.f), faded(pal::goldBright, entranceOpacity), 2.f);
+    outlineRect(t, shrink(banner, 14.f), faded(C(127, 88, 46), entranceOpacity), 1.f);
+
+    // Heraldic accents deliberately don't depict a particular hero.
+    drawDiamond(t, {banner.position.x + 84.f, banner.position.y + 63.f}, 3.f, faded(pal::gold, entranceOpacity));
+    drawDiamond(t, {banner.position.x + banner.size.x - 84.f, banner.position.y + 63.f}, 3.f, faded(pal::gold, entranceOpacity));
+    pixelfont::draw(t, "VICTORY!",
+                    {cx - pixelfont::measure("VICTORY!", 9.f) / 2.f, banner.position.y + 24.f},
+                    {9.f, C(255, 232, 155), pal::goldBright, true}, entranceOpacity);
+
+    fillRect(t, {{banner.position.x + 176.f, banner.position.y + 103.f},
+                 {banner.size.x - 352.f, 2.f}}, faded(C(149, 106, 57), entranceOpacity));
+
+    const std::string heroName = s.characters.empty() ? "The hero" : s.characters.front().name;
+
+    auto centeredText = [&](const std::string& message, float y, unsigned size, C color, float opacity, bool italic = false)
+    {
+        sf::Text text(a.font, message, size);
+        if (italic)
+            text.setStyle(sf::Text::Italic);
+        const R bounds = text.getLocalBounds();
+        text.setPosition({std::round(cx - bounds.position.x - bounds.size.x / 2.f), std::round(y)});
+        sf::Text shadow = text;
+        shadow.move({1.f, 1.f});
+        shadow.setFillColor(faded(C(0, 0, 0, 210), opacity));
+        t.draw(shadow);
+        text.setFillColor(faded(color, opacity));
+        t.draw(text);
+    };
+
+    centeredText(heroName + " stands triumphant.", banner.position.y + 115.f, 27, pal::text, entranceOpacity);
+    fillRect(t, {{banner.position.x + 248.f, banner.position.y + 150.f},
+                 {banner.size.x - 496.f, 1.f}}, faded(C(109, 77, 46), punchlineOpacity));
+    centeredText("\"Now where is that damn gold you promised me!?\"",
+                 banner.position.y + 159.f, 23, C(244, 194, 147), punchlineOpacity, true);
+    centeredText("- " + heroName, banner.position.y + 195.f, 16, pal::textDim, punchlineOpacity);
+}
+
 void drawHeroPanel(sf::RenderTarget& t, const Assets& a, const ViewState& s, const UiState& ui)
 {
     const R r = layout::heroPanel;
@@ -743,6 +817,7 @@ void drawScene(sf::RenderTarget& target, const Assets& assets, const ViewState& 
     target.clear(pal::background);
     drawTitleBar(target, assets, state);
     drawBattlefield(target, assets, state, ui);
+    drawVictoryBanner(target, assets, state, ui.victoryElapsedSeconds);
     drawHeroPanel(target, assets, state, ui);
     drawRosterPanel(target, assets, state, ui);
     drawLogPanel(target, assets, state, ui);

@@ -22,6 +22,7 @@ struct Style
 float measure(std::string_view text, float scale);
 inline float height(float scale) { return 7.f * scale; }
 
-// Returns the drawn width.
-float draw(sf::RenderTarget& target, std::string_view text, sf::Vector2f position, const Style& style);
+// Returns the drawn width. Opacity (0..1) fades both glyphs and their shadow.
+float draw(sf::RenderTarget& target, std::string_view text, sf::Vector2f position,
+           const Style& style, float opacity = 1.f);
 } // namespace pixelfont

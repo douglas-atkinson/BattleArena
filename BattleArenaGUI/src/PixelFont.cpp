@@ -2,9 +2,11 @@
 
 #include <SFML/Graphics/VertexArray.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <unordered_map>
 
 namespace pixelfont
@@ -83,8 +85,19 @@ float measure(std::string_view text, float scale)
     return static_cast<float>(text.size()) * 6.f * scale - scale;
 }
 
-float draw(sf::RenderTarget& target, std::string_view text, sf::Vector2f position, const Style& style)
+float draw(sf::RenderTarget& target, std::string_view text, sf::Vector2f position,
+           const Style& style, float opacity)
 {
+    const float alpha = std::clamp(opacity, 0.f, 1.f);
+    const auto faded = [alpha](sf::Color color)
+    {
+        color.a = static_cast<std::uint8_t>(std::lround(static_cast<float>(color.a) * alpha));
+        return color;
+    };
+    const sf::Color glyphTop = faded(style.top);
+    const sf::Color glyphBottom = faded(style.bottom);
+    const sf::Color glyphShadow = faded(sf::Color(0, 0, 0, 210));
+
     const float s = style.scale;
     position = {std::round(position.x), std::round(position.y)};
     sf::VertexArray shadow(sf::PrimitiveType::Triangles);
@@ -104,8 +117,8 @@ float draw(sf::RenderTarget& target, std::string_view text, sf::Vector2f positio
                     continue;
                 const sf::Vector2f p{x + static_cast<float>(col) * s, position.y + static_cast<float>(row) * s};
                 if (style.shadow)
-                    addQuad(shadow, {p.x + s, p.y + s}, s, sf::Color(0, 0, 0, 210));
-                addQuad(body, p, s, row < 3 ? style.top : style.bottom);
+                    addQuad(shadow, {p.x + s, p.y + s}, s, glyphShadow);
+                addQuad(body, p, s, row < 3 ? glyphTop : glyphBottom);
             }
         x += 6.f * s;
     }
