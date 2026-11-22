@@ -1,13 +1,15 @@
 // BattleArena graphical interface.
 //
-// Builds the real demonstration Arena and draws its snapshot. This phase is a read-only
-// view: the GUI never calls previewCommand() or submitCommand(), so no turn can happen.
+// Builds the real demonstration Arena and draws its snapshot. Typed commands are checked
+// with Arena::previewCommand(), which changes nothing; submitCommand() is never called,
+// so no turn can happen yet.
 //
 // Command-line options (handy for reviews and documentation):
 //   --screenshot <file.png>   render one frame to an image and exit
 //   --select <index>          start with a character selected (0 = hero, 1-4 = monsters)
 //   --hover <x> <y>           simulate the mouse at a view position (with --screenshot)
 //   --log-scroll <lines>      start with the combat log scrolled up (clamped)
+//   --preview <command>       start with a pending command and its live preview (never submitted)
 // Visual test mode (labelled on screen as "VISUAL TEST", never the live game):
 //   --test-grid <cols>x<rows> show the characters on another grid size (positions rescaled)
 //   --test-log <n>            add n placeholder log lines to exercise the log scrollbar
@@ -22,6 +24,7 @@
 #include <SFML/Graphics.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <iostream>
@@ -87,29 +90,58 @@ void updateHover(UiState& ui, const ViewState& state, sf::Vector2f mouse)
     ui.hoveredTile = tileAt(mouse, state);
 }
 
-// Typing only edits the command box; nothing is sent to the Arena yet.
-void handleKey(sf::Keyboard::Key key, UiState& ui, sf::RenderWindow& window)
+// Edits the pending command and returns true if it changed. R and F are standalone
+// actions; a movement key after one of them starts a new movement command. Up to 8
+// characters are kept so the Arena can reject commands longer than the hero's speed.
+constexpr std::size_t maxPending = 8;  // what the command box can show
+
+bool handleKey(sf::Keyboard::Key key, UiState& ui, sf::RenderWindow& window)
 {
     using K = sf::Keyboard::Key;
-    constexpr std::size_t maxPending = 8;
-    auto push = [&](char c) {
+    const std::string before = ui.pending;
+    auto move = [&](char c) {
+        if (ui.pending == "R" || ui.pending == "F")
+            ui.pending.clear();
         if (ui.pending.size() < maxPending)
             ui.pending += c;
     };
     switch (key)
     {
-    case K::W: push('W'); break;
-    case K::A: push('A'); break;
-    case K::S: push('S'); break;
-    case K::D: push('D'); break;
+    case K::W: move('W'); break;
+    case K::A: move('A'); break;
+    case K::S: move('S'); break;
+    case K::D: move('D'); break;
     case K::R: ui.pending = "R"; break;
+    case K::F: ui.pending = "F"; break;
     case K::Backspace:
         if (!ui.pending.empty())
             ui.pending.pop_back();
         break;
+    case K::Enter: ui.submitNotice = true; break;  // not enabled yet: nothing is submitted
     case K::Escape: window.close(); break;
     default: break;
     }
+    if (ui.pending == before)
+        return false;
+    ui.submitNotice = false;
+    return true;
+}
+
+// Asks the Arena about the pending command and stores what the renderer should show.
+// The Arena is const here: previewCommand() is the only call, and it changes nothing.
+// In the --test-grid visual test the characters are drawn at rescaled positions, so a
+// preview of the real Arena would not match the picture and is not shown.
+void updatePreview(ViewState& state, const Arena& arena, const std::string& pending, bool livePositions)
+{
+    state.preview = {};
+    if (pending.empty())
+        return;
+    if (!livePositions)
+    {
+        state.preview.feedback = "Command previews are off in the test-grid visual test";
+        return;
+    }
+    state.preview = makeCommandPreviewView(arena.previewCommand(pending), state.characters.front().tile);
 }
 } // namespace
 
@@ -118,6 +150,7 @@ int main(int argc, char** argv)
     std::optional<std::string> screenshotPath;
     std::optional<layout::Grid> testGrid;
     int testLogLines = 0;
+    std::string initialCommand;
     UiState ui;
     for (int i = 1; i < argc; ++i)
     {
@@ -133,6 +166,12 @@ int main(int argc, char** argv)
         }
         else if (arg == "--log-scroll" && i + 1 < argc)
             ui.logScroll = std::stoi(argv[++i]);
+        else if (arg == "--preview" && i + 1 < argc)
+        {
+            initialCommand = std::string(argv[++i]).substr(0, maxPending);
+            for (char& ch : initialCommand)
+                ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+        }
         else if (arg == "--test-log" && i + 1 < argc)
             testLogLines = std::max(0, std::stoi(argv[++i]));
         else if (arg == "--test-grid" && i + 1 < argc)
@@ -187,6 +226,8 @@ int main(int argc, char** argv)
 
     ui.logScroll = logscroll::clampScroll(ui.logScroll, static_cast<int>(state.log.size()));
     ui.selected = std::clamp(ui.selected, -1, static_cast<int>(state.characters.size()) - 1);
+    ui.pending = initialCommand;
+    updatePreview(state, arena, ui.pending, !testGrid);
     if (ui.mouse.x >= 0.f)
         updateHover(ui, state, ui.mouse);
 
@@ -219,7 +260,10 @@ int main(int argc, char** argv)
             else if (const auto* resized = event->getIf<sf::Event::Resized>())
                 window.setView(makeView(resized->size));
             else if (const auto* key = event->getIf<sf::Event::KeyPressed>())
-                handleKey(key->code, ui, window);
+            {
+                if (handleKey(key->code, ui, window))
+                    updatePreview(state, arena, ui.pending, !testGrid);
+            }
             else if (const auto* moved = event->getIf<sf::Event::MouseMoved>())
             {
                 const sf::Vector2f p = window.mapPixelToCoords(moved->position);

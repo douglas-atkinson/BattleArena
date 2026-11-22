@@ -11,6 +11,7 @@
 #include <SFML/Graphics/Color.hpp>
 #include <SFML/System/Vector2.hpp>
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -37,6 +38,18 @@ struct LogEntry
     LogKind kind;
 };
 
+// What the command bar and battlefield show for the pending (not yet submitted) command.
+// Built from Arena::previewCommand() by makeCommandPreviewView(); the GUI never judges
+// commands itself.
+enum class FeedbackTone { Neutral, Valid, Invalid };
+
+struct CommandPreviewView
+{
+    std::string feedback;                  // empty: show the default instruction
+    FeedbackTone tone = FeedbackTone::Neutral;
+    std::optional<sf::Vector2i> ghostTile;  // where a translucent hero is drawn, if anywhere
+};
+
 struct ViewState
 {
     int round = 1;                      // the round shown: the upcoming one while the battle continues
@@ -49,6 +62,7 @@ struct ViewState
     std::vector<Character> characters;  // index 0 is the hero, then monsters in ID order
     std::vector<LogEntry> log;          // oldest first
     std::string visualTest;             // non-empty only in a visual test mode (see main.cpp)
+    CommandPreviewView preview;         // feedback for the pending command
 };
 
 // The one place where a model Position {row, col} becomes a screen tile (col, row).
@@ -132,4 +146,34 @@ inline void applyTestGrid(ViewState& v, const layout::Grid& grid)
         placed.push_back(c.tile);
     }
     v.grid = grid;
+}
+
+// Turns the Arena's verdict on a pending command into what the GUI shows. Validity, the
+// destination, and every explanation come from the CommandPreview; this only words the
+// successful cases and decides whether a ghost is worth drawing.
+inline CommandPreviewView makeCommandPreviewView(const CommandPreview& preview, sf::Vector2i heroTile)
+{
+    CommandPreviewView view;
+    if (!preview.canSubmit)
+    {
+        view.feedback = preview.message;  // e.g. "Movement blocked." or the speed limit
+        view.tone = FeedbackTone::Invalid;
+        return view;
+    }
+    view.tone = FeedbackTone::Valid;
+    switch (preview.action)
+    {
+    case PlayerAction::Rest: view.feedback = "Rest available"; break;
+    case PlayerAction::Fight: view.feedback = "Fight available"; break;
+    case PlayerAction::Move:
+        if (toTile(preview.destination) == heroTile)
+            view.feedback = "Move available: ends on the starting square";
+        else
+        {
+            view.feedback = "Move available";
+            view.ghostTile = toTile(preview.destination);
+        }
+        break;
+    }
+    return view;
 }

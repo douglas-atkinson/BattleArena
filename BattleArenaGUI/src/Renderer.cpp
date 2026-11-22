@@ -290,6 +290,17 @@ void drawBattlefield(sf::RenderTarget& t, const Assets& a, const ViewState& s, c
         drawImage(t, spriteFor(a, c), tile.position, layout::artScale);
     }
 
+    // Translucent hero at the previewed destination: a dynamic overlay, never selectable, drawn
+    // under the selection brackets and tooltip so it hides neither.
+    if (s.preview.ghostTile)
+    {
+        const R tile = grid.tileRect(*s.preview.ghostTile);
+        const Character& hero = s.characters.front();
+        fillRect(t, shrink(tile, 1.f), withAlpha(hero.accent, 40));
+        outlineRect(t, shrink(tile, 1.f), withAlpha(hero.accent, 170), 1.f);
+        drawImage(t, spriteFor(a, hero), tile.position, layout::artScale, C(200, 225, 255, 130));
+    }
+
     // Selection brackets (gold corners) around the selected character's tile.
     if (ui.selected >= 0 && s.characters[static_cast<std::size_t>(ui.selected)].onBattlefield)
     {
@@ -514,13 +525,11 @@ void drawCommandBar(sf::RenderTarget& t, const Assets& a, const ViewState& s, co
         px += pixelfont::measure(one, 3.f) + 9.f;
     }
     fillRect(t, {{px, cy - 10.f}, {12.f, 21.f}}, withAlpha(pal::goldBright, 170));  // block cursor
-    drawText(t, a.font, "command execution is not enabled yet", {box.position.x + box.size.x + 10.f, cy - 10.f}, 15,
-             pal::textFaint);
 
     // Fight is always listed, muted while no living monster is adjacent (the Arena's canFight),
-    // so the hints never shift as its availability changes.
+    // so the hints never shift as its availability changes. Submitting is not enabled yet.
     struct Hint { std::vector<std::string> keys; std::string label; bool enabled = true; };
-    const std::vector<Hint> hints{{{"W", "A", "S", "D"}, "Move"}, {{"Enter"}, "Submit"}, {{"Backspace"}, "Edit"},
+    const std::vector<Hint> hints{{{"W", "A", "S", "D"}, "Move"}, {{"Enter"}, "Submit", false}, {{"Backspace"}, "Edit"},
                                   {{"R"}, "Rest"}, {{"F"}, "Fight", s.canFight}, {{"Esc"}, "Exit"}};
     // Measure, then right-align.
     float total = 0.f;
@@ -531,6 +540,36 @@ void drawCommandBar(sf::RenderTarget& t, const Assets& a, const ViewState& s, co
         total += textWidth(a.font, h.label, 17) + 30.f;
     }
     float x = r.position.x + r.size.x - 20.f - total;
+
+    // Feedback on the pending command, from the Arena's preview. Long messages shrink a
+    // little, then are shortened, so they never run into the hints.
+    std::string feedback = "Enter a command";
+    C color = pal::textFaint;
+    if (ui.submitNotice)
+    {
+        feedback = "Submitting turns is not enabled yet";
+        color = pal::gold;
+    }
+    else if (!s.preview.feedback.empty())
+    {
+        feedback = s.preview.feedback;
+        color = s.preview.tone == FeedbackTone::Valid     ? lighten(pal::green, 20)
+                : s.preview.tone == FeedbackTone::Invalid ? lighten(pal::red, 30)
+                                                          : pal::textDim;
+    }
+    const float fx = box.position.x + box.size.x + 10.f;
+    const float room = x - 16.f - fx;
+    unsigned size = 15;
+    while (size > 13 && textWidth(a.font, feedback, size) > room)
+        --size;
+    if (textWidth(a.font, feedback, size) > room)
+    {
+        while (!feedback.empty() && textWidth(a.font, feedback + "...", size) > room)
+            feedback.pop_back();
+        feedback += "...";
+    }
+    drawText(t, a.font, feedback, {fx, cy - 10.f + (15.f - static_cast<float>(size)) / 2.f}, size, color);
+
     for (const auto& h : hints)
     {
         for (const auto& k : h.keys)

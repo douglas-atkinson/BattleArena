@@ -46,6 +46,7 @@ struct UiState
     int selected = -1;                      // character index clicked
     std::optional<sf::Vector2i> hoveredTile;
     std::string pending;                    // typed command (not executed yet)
+    bool submitNotice = false;              // Enter was pressed: explain that submitting is not enabled yet
     int logScroll = 0;                      // lines scrolled up from the newest entry
     bool draggingLogThumb = false;          // left button held on the log scrollbar thumb
     float logThumbGrabOffset = 0.f;         // mouse y minus thumb top when the drag began
