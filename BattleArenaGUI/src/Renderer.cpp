@@ -551,7 +551,7 @@ private:
 void drawLogPanel(sf::RenderTarget& t, const Assets& a, const ViewState& s, const UiState& ui)
 {
     const R r = layout::logPanel;
-    const int total = static_cast<int>(s.log.size());
+    const int total = static_cast<int>(ui.logRows.size());
     const int scroll = logscroll::clampScroll(ui.logScroll, total);
     drawFrame(t, a, r);
     pixelfont::draw(t, "COMBAT LOG", {r.position.x + 18.f, r.position.y + 16.f}, heading());
@@ -563,25 +563,25 @@ void drawLogPanel(sf::RenderTarget& t, const Assets& a, const ViewState& s, cons
     drawInset(t, area, C(16, 15, 14));
 
     const int lines = logscroll::visibleLines();
-    const int last = total - 1 - scroll;                 // newest visible entry
+    const int last = total - 1 - scroll;  // newest visible text row
     const int first = std::max(0, last - lines + 1);
-    const float textW = area.size.x - 30.f;
     float y = area.position.y + 4.f;
     {
-    const ScopedClip clip(t, shrink(area, 1.f));         // log text never renders outside the log well
-    for (int i = first; i <= last; ++i)
-    {
-        const LogEntry& e = s.log[static_cast<std::size_t>(i)];
-        const bool newest = i == total - 1;
-        if (e.round == s.log.back().round)  // the most recent round in the log
-            fillRect(t, {{area.position.x + 2.f, y - 1.f}, {area.size.x - 18.f, layout::logLineHeight - 1.f}}, C(255, 220, 160, newest ? 18 : 9));
-        drawText(t, a.font, "R" + std::to_string(e.round), {area.position.x + 8.f, y}, 14, pal::textFaint, false);
-        std::string msg = e.text;
-        while (msg.size() > 4 && textWidth(a.font, msg, 16) > textW - 40.f)
-            msg = msg.substr(0, msg.size() - 4) + "...";
-        drawText(t, a.font, msg, {area.position.x + 42.f, y - 1.f}, 16, logColor(e.kind));
-        y += layout::logLineHeight;
-    }
+        const ScopedClip clip(t, shrink(area, 1.f));  // no text escapes the log well
+        for (int i = first; i <= last; ++i)
+        {
+            const loglayout::Row& row = ui.logRows[static_cast<std::size_t>(i)];
+            const LogEntry& entry = s.log[row.entryIndex];
+            const bool newest = row.entryIndex == s.log.size() - 1;
+            if (entry.round == s.log.back().round)
+                fillRect(t, {{area.position.x + 2.f, y - 1.f}, {area.size.x - 18.f, layout::logLineHeight - 1.f}},
+                         C(255, 220, 160, newest ? 18 : 9));
+            if (row.firstOfEntry)
+                drawText(t, a.font, "R" + std::to_string(entry.round),
+                         {area.position.x + 8.f, y}, 14, pal::textFaint, false);
+            drawText(t, a.font, row.text, {area.position.x + 42.f, y - 1.f}, 16, logColor(entry.kind));
+            y += layout::logLineHeight;
+        }
     } // clip ends
 
     // Scrollbar: the log scrolls internally; the window never scrolls.

@@ -3,8 +3,8 @@
 // Combat-log scrollbar geometry and scroll math, shared by the renderer (drawing)
 // and main.cpp (hit testing / dragging) so both always agree on where the thumb is.
 //
-// Scroll position is measured in whole lines scrolled up from the newest entry:
-// 0 shows the latest entries (thumb at the bottom), maxScroll shows the oldest
+// Scroll position is measured in visual text rows, not source log entries:
+// 0 shows the latest wrapped rows (thumb at the bottom), maxScroll shows the oldest
 // (thumb at the top).
 
 #include "Layout.hpp"

@@ -4,6 +4,7 @@
 
 #include "Art.hpp"
 #include "Layout.hpp"
+#include "LogLayout.hpp"
 #include "ViewState.hpp"
 
 #include <SFML/Graphics/Font.hpp>
@@ -14,6 +15,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <vector>
 
 struct Assets
 {
@@ -46,7 +48,8 @@ struct UiState
     int selected = -1;                      // character index clicked
     std::optional<sf::Vector2i> hoveredTile;
     std::string pending;                    // typed command, submitted with Enter
-    int logScroll = 0;                      // lines scrolled up from the newest entry
+    int logScroll = 0;                      // visual rows scrolled up from the latest text
+    std::vector<loglayout::Row> logRows;    // cached wrapped rows, built after log changes
     bool draggingLogThumb = false;          // left button held on the log scrollbar thumb
     float logThumbGrabOffset = 0.f;         // mouse y minus thumb top when the drag began
     float outcomeElapsedSeconds = 2.4f;    // fully visible for static views; timed in live play

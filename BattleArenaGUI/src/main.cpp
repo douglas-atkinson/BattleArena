@@ -80,9 +80,9 @@ std::optional<layout::Grid> parseGrid(const std::string& text)
     return grid;
 }
 
-logscroll::Geometry logGeometry(const ViewState& state, const UiState& ui)
+logscroll::Geometry logGeometry(const UiState& ui)
 {
-    return logscroll::geometry(static_cast<int>(state.log.size()), ui.logScroll);
+    return logscroll::geometry(static_cast<int>(ui.logRows.size()), ui.logScroll);
 }
 
 void updateHover(UiState& ui, const ViewState& state, sf::Vector2f mouse)
@@ -151,7 +151,7 @@ void updatePreview(ViewState& state, const Arena& arena, const std::string& pend
 // Enter: sends the pending command to the Arena, which validates it and, if it is legal,
 // plays one complete round. A rejected command changes nothing and stays in the box for
 // correction; an accepted one refreshes the whole view from the returned snapshot.
-void submitPending(Arena& arena, ViewState& state, UiState& ui)
+void submitPending(Arena& arena, ViewState& state, UiState& ui, const sf::Font& font)
 {
     if (state.battleOver)
         return;
@@ -174,9 +174,12 @@ void submitPending(Arena& arena, ViewState& state, UiState& ui)
         return;
     }
 
-    const int added = applyTurnResult(state, result);
-    if (ui.logScroll > 0)  // the reader had scrolled up: keep the same lines in view
-        ui.logScroll = logscroll::clampScroll(ui.logScroll + added, static_cast<int>(state.log.size()));
+    const int previousRows = static_cast<int>(ui.logRows.size());
+    applyTurnResult(state, result);
+    ui.logRows = loglayout::buildRows(state.log, font);
+    const int totalRows = static_cast<int>(ui.logRows.size());
+    if (ui.logScroll > 0)  // hold the same visible text rows while new messages arrive
+        ui.logScroll = logscroll::clampScroll(ui.logScroll + totalRows - previousRows, totalRows);
     ui.pending.clear();
     updatePreview(state, arena, ui.pending, true);
     updateHover(ui, state, ui.mouse);  // characters may have moved under the mouse
@@ -262,7 +265,8 @@ int main(int argc, char** argv)
     if (!assets.load(exeDir, state.grid))
         return 1;
 
-    ui.logScroll = logscroll::clampScroll(ui.logScroll, static_cast<int>(state.log.size()));
+    ui.logRows = loglayout::buildRows(state.log, assets.font);
+    ui.logScroll = logscroll::clampScroll(ui.logScroll, static_cast<int>(ui.logRows.size()));
     ui.selected = std::clamp(ui.selected, -1, static_cast<int>(state.characters.size()) - 1);
     ui.pending = initialCommand;
     updatePreview(state, arena, ui.pending, !testGrid);
@@ -307,7 +311,7 @@ int main(int argc, char** argv)
                     // One submission per physical press: key-repeat events are ignored.
                     if (!enterHeld)
                     {
-                        submitPending(arena, state, ui);
+                        submitPending(arena, state, ui, assets.font);
                         if (!assets.prepareBattlefield(state.grid))  // no-op while the grid is unchanged
                             return 1;
                     }
@@ -330,7 +334,7 @@ int main(int argc, char** argv)
                     if (!sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
                         ui.draggingLogThumb = false;
                     else
-                        ui.logScroll = logscroll::scrollForThumbTop(logGeometry(state, ui), p.y - ui.logThumbGrabOffset);
+                        ui.logScroll = logscroll::scrollForThumbTop(logGeometry(ui), p.y - ui.logThumbGrabOffset);
                 }
                 updateHover(ui, state, p);
             }
@@ -346,7 +350,7 @@ int main(int argc, char** argv)
                 if (click->button == sf::Mouse::Button::Left)
                 {
                     const sf::Vector2f p = window.mapPixelToCoords(click->position);
-                    const logscroll::Geometry sb = logGeometry(state, ui);
+                    const logscroll::Geometry sb = logGeometry(ui);
                     if (sb.track.contains(p))
                     {
                         // Scrollbar clicks never change the selection.
@@ -379,7 +383,7 @@ int main(int argc, char** argv)
                     wheelRemainder += wheel->delta;
                     const int lines = static_cast<int>(wheelRemainder);
                     wheelRemainder -= static_cast<float>(lines);
-                    ui.logScroll = logscroll::clampScroll(ui.logScroll + lines, static_cast<int>(state.log.size()));
+                    ui.logScroll = logscroll::clampScroll(ui.logScroll + lines, static_cast<int>(ui.logRows.size()));
                 }
             }
         }
