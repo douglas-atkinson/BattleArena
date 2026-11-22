@@ -290,8 +290,8 @@ int main(int argc, char** argv)
 
     float wheelRemainder = 0.f;
     bool enterHeld = false;
-    sf::Clock victoryClock;
-    bool victoryStarted = false;
+    sf::Clock outcomeClock;
+    bool outcomeStarted = false;
     while (window.isOpen())
     {
         while (const std::optional event = window.pollEvent())
@@ -384,14 +384,14 @@ int main(int argc, char** argv)
             }
         }
 
-        // Trigger the presentation effect only when the model reports victory.
-        if (state.battleOver && state.heroWon && !victoryStarted)
+        // Animate the plaque once, when the model reports either victory or defeat.
+        if (state.battleOver && !outcomeStarted)
         {
-            victoryClock.restart();
-            victoryStarted = true;
+            outcomeClock.restart();
+            outcomeStarted = true;
         }
-        if (victoryStarted)
-            ui.victoryElapsedSeconds = victoryClock.getElapsedTime().asSeconds();
+        if (outcomeStarted)
+            ui.outcomeElapsedSeconds = outcomeClock.getElapsedTime().asSeconds();
 
         drawScene(window, assets, state, ui);
         window.display();

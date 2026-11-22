@@ -340,11 +340,11 @@ void drawBattlefield(sf::RenderTarget& t, const Assets& a, const ViewState& s, c
     }
 }
 
-// Presentation-only celebration: the Arena owns the result, and the hero's current
-// name supplies the wording. No portrait or specific character artwork is assumed.
-void drawVictoryBanner(sf::RenderTarget& t, const Assets& a, const ViewState& s, float elapsedSeconds)
+// Outcome plaque: visual feedback only. The Arena decides the result, and no
+// portrait or hero-specific artwork is required.
+void drawOutcomePlaque(sf::RenderTarget& t, const Assets& a, const ViewState& s, float elapsedSeconds)
 {
-    if (!s.battleOver || !s.heroWon)
+    if (!s.battleOver)
         return;
 
     // Smoothstep easing prevents the fade from starting or stopping abruptly.
@@ -364,6 +364,27 @@ void drawVictoryBanner(sf::RenderTarget& t, const Assets& a, const ViewState& s,
         return color;
     };
 
+    const bool victory = s.heroWon;
+    const std::string heroName = s.characters.empty() ? "The hero" : s.characters.front().name;
+    const std::string title = victory ? "VICTORY!" : "DEFEAT!";
+    const std::string declaration = victory ? heroName + " stands triumphant."
+                                            : heroName + " has fallen. His courage will be remembered.";
+    const std::string quip = victory ? "\"Now where is that damn gold you promised me!?\""
+                                     : "\"So... I suppose I'm not getting paid?\"";
+    const std::string attribution = victory ? "- " + heroName : "- " + heroName + "'s final words";
+
+    // Keep the same plaque geometry and theatrical timing for both outcomes.
+    const C plaqueFill = victory ? C(54, 32, 27, 248) : C(43, 31, 36, 248);
+    const C outerTrim = victory ? pal::goldBright : C(218, 146, 142);
+    const C innerTrim = victory ? C(127, 88, 46) : C(119, 73, 78);
+    const C heraldry = victory ? pal::gold : C(183, 121, 121);
+    const C titleTop = victory ? C(255, 232, 155) : C(245, 191, 187);
+    const C titleBottom = victory ? pal::goldBright : C(219, 133, 129);
+    const C topRule = victory ? C(149, 106, 57) : C(153, 92, 97);
+    const C lowerRule = victory ? C(109, 77, 46) : C(122, 78, 83);
+    const C seriousColor = victory ? pal::text : C(231, 211, 205);
+    const C jokeColor = victory ? C(244, 194, 147) : C(229, 181, 170);
+
     const R field = layout::battlefield;
     fillRect(t, shrink(field, 10.f), faded(C(7, 5, 4, 125), entranceOpacity));
 
@@ -372,24 +393,22 @@ void drawVictoryBanner(sf::RenderTarget& t, const Assets& a, const ViewState& s,
                    {872.f, 238.f}};
     const float cx = banner.position.x + banner.size.x / 2.f;
 
-    // Deep burgundy parchment, shadow, and gold inlays.
+    // The two outcomes share the wood-and-iron geometry with different accents.
     fillRect(t, {{banner.position.x + 7.f, banner.position.y + 8.f}, banner.size}, faded(C(0, 0, 0, 160), entranceOpacity));
     fillRect(t, banner, faded(C(10, 8, 7, 245), entranceOpacity));
-    fillRect(t, shrink(banner, 4.f), faded(C(54, 32, 27, 248), entranceOpacity));
-    outlineRect(t, shrink(banner, 8.f), faded(pal::goldBright, entranceOpacity), 2.f);
-    outlineRect(t, shrink(banner, 14.f), faded(C(127, 88, 46), entranceOpacity), 1.f);
+    fillRect(t, shrink(banner, 4.f), faded(plaqueFill, entranceOpacity));
+    outlineRect(t, shrink(banner, 8.f), faded(outerTrim, entranceOpacity), 2.f);
+    outlineRect(t, shrink(banner, 14.f), faded(innerTrim, entranceOpacity), 1.f);
 
     // Heraldic accents deliberately don't depict a particular hero.
-    drawDiamond(t, {banner.position.x + 84.f, banner.position.y + 63.f}, 3.f, faded(pal::gold, entranceOpacity));
-    drawDiamond(t, {banner.position.x + banner.size.x - 84.f, banner.position.y + 63.f}, 3.f, faded(pal::gold, entranceOpacity));
-    pixelfont::draw(t, "VICTORY!",
-                    {cx - pixelfont::measure("VICTORY!", 9.f) / 2.f, banner.position.y + 24.f},
-                    {9.f, C(255, 232, 155), pal::goldBright, true}, entranceOpacity);
+    drawDiamond(t, {banner.position.x + 84.f, banner.position.y + 63.f}, 3.f, faded(heraldry, entranceOpacity));
+    drawDiamond(t, {banner.position.x + banner.size.x - 84.f, banner.position.y + 63.f}, 3.f, faded(heraldry, entranceOpacity));
+    pixelfont::draw(t, title,
+                    {cx - pixelfont::measure(title, 9.f) / 2.f, banner.position.y + 24.f},
+                    {9.f, titleTop, titleBottom, true}, entranceOpacity);
 
     fillRect(t, {{banner.position.x + 176.f, banner.position.y + 103.f},
-                 {banner.size.x - 352.f, 2.f}}, faded(C(149, 106, 57), entranceOpacity));
-
-    const std::string heroName = s.characters.empty() ? "The hero" : s.characters.front().name;
+                 {banner.size.x - 352.f, 2.f}}, faded(topRule, entranceOpacity));
 
     auto centeredText = [&](const std::string& message, float y, unsigned size, C color, float opacity, bool italic = false)
     {
@@ -406,12 +425,11 @@ void drawVictoryBanner(sf::RenderTarget& t, const Assets& a, const ViewState& s,
         t.draw(text);
     };
 
-    centeredText(heroName + " stands triumphant.", banner.position.y + 115.f, 27, pal::text, entranceOpacity);
+    centeredText(declaration, banner.position.y + 115.f, victory ? 27u : 24u, seriousColor, entranceOpacity);
     fillRect(t, {{banner.position.x + 248.f, banner.position.y + 150.f},
-                 {banner.size.x - 496.f, 1.f}}, faded(C(109, 77, 46), punchlineOpacity));
-    centeredText("\"Now where is that damn gold you promised me!?\"",
-                 banner.position.y + 159.f, 23, C(244, 194, 147), punchlineOpacity, true);
-    centeredText("- " + heroName, banner.position.y + 195.f, 16, pal::textDim, punchlineOpacity);
+                 {banner.size.x - 496.f, 1.f}}, faded(lowerRule, punchlineOpacity));
+    centeredText(quip, banner.position.y + 159.f, 23, jokeColor, punchlineOpacity, true);
+    centeredText(attribution, banner.position.y + 195.f, 16, pal::textDim, punchlineOpacity);
 }
 
 void drawHeroPanel(sf::RenderTarget& t, const Assets& a, const ViewState& s, const UiState& ui)
@@ -817,7 +835,7 @@ void drawScene(sf::RenderTarget& target, const Assets& assets, const ViewState& 
     target.clear(pal::background);
     drawTitleBar(target, assets, state);
     drawBattlefield(target, assets, state, ui);
-    drawVictoryBanner(target, assets, state, ui.victoryElapsedSeconds);
+    drawOutcomePlaque(target, assets, state, ui.outcomeElapsedSeconds);
     drawHeroPanel(target, assets, state, ui);
     drawRosterPanel(target, assets, state, ui);
     drawLogPanel(target, assets, state, ui);
