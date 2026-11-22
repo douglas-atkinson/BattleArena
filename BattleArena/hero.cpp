@@ -4,6 +4,7 @@
 #include "herotitle.h"
 #include "position.h"
 #include "movementresult.h"
+#include <algorithm>
 #include <cctype>
 #include <string>
 
@@ -13,13 +14,17 @@ Hero::Hero(const std::string& name, HeroTitle title, int hitPoints, int strength
     : Combatant(name, hitPoints, strength, accuracy, agility, defense, speed, position, portrait),
     title(title), level(1), victories(0) {}
 
-MovementResult Hero::moveByPlayerCommand(const std::string& commands, const WorldState& world) {
+MovementValidation Hero::validateMoveCommand(const std::string& commands, const WorldState& world) const {
+    // Any rejection leaves the destination at the hero's current square.
+    const MovementValidation invalid{ MovementResult::InvalidCommand, position, false };
+    const MovementValidation blocked{ MovementResult::Blocked, position, false };
+
     if (commands.empty()) {
-        return MovementResult::InvalidCommand;
+        return invalid;
     }
 
     if (commands.size() > static_cast<std::size_t>(getSpeed())) {
-        return MovementResult::InvalidCommand;
+        return invalid;
     }
 
     std::string normalized;
@@ -32,38 +37,52 @@ MovementResult Hero::moveByPlayerCommand(const std::string& commands, const Worl
     }
 
     if (normalized == "r") {
-        return MovementResult::Success;
+        return MovementValidation{ MovementResult::Success, position, true };
     }
 
     if (normalized.find('r') != std::string::npos) {
-        return MovementResult::InvalidCommand;
+        return invalid;
     }
 
 	const std::string validCommands = "wasd";
     for (char command : normalized) {
         if (validCommands.find(command) == std::string::npos) {
-            return MovementResult::InvalidCommand;
+            return invalid;
         }
 	}
 
-    for (char command : normalized) {
-        Position newPos = position;
+    // Walk the whole path on a local copy; every intermediate square must be open.
+    Position pathPos = position;
 
+    for (char command : normalized) {
         switch (command) {
-        case 'w': newPos.row -= 1; break;
-        case 'a': newPos.col -= 1; break;
-        case 's': newPos.row += 1; break;
-        case 'd': newPos.col += 1; break;
+        case 'w': pathPos.row -= 1; break;
+        case 'a': pathPos.col -= 1; break;
+        case 's': pathPos.row += 1; break;
+        case 'd': pathPos.col += 1; break;
         default:
-			return MovementResult::InvalidCommand; // don't really need this since we validated above, but just in case
+			return invalid; // don't really need this since we validated above, but just in case
         }
 
-        if (!tryMoveTo(newPos, world)) {
-            return MovementResult::Blocked;
+        if (!world.isInBounds(pathPos)) {
+            return blocked;
+        }
+
+        // world.heroPosition is the hero's own starting square, which the path may revisit.
+        if (pathPos != position && world.isOccupied(pathPos)) {
+            return blocked;
         }
     }
 
-    return MovementResult::Success;
+    return MovementValidation{ MovementResult::Success, pathPos, false };
+}
+
+MovementResult Hero::moveByPlayerCommand(const std::string& commands, const WorldState& world) {
+    MovementValidation validation = validateMoveCommand(commands, world);
+    if (validation.status == MovementResult::Success && !validation.isRest) {
+        position = validation.destination;
+    }
+    return validation.status;
 }
 
 AttackResult Hero::attack(Combatant& target) {
@@ -92,6 +111,8 @@ int Hero::getVictories() const {
 }
 
 void Hero::recordVictory() {
+    // Increasing maxHitPoints does not immediately restore HP.
+    // Healing can subsequently recover HP up to the new maximum.
     ++victories;
     if (victories % 3 == 0) {
         ++level;
@@ -102,4 +123,14 @@ void Hero::recordVictory() {
             maxHitPoints = maxHitPoints * 6 / 5;
         }
     }
+}
+
+int Hero::recoverHitPoints(int amount) {
+    if (!isAlive() || amount <= 0) {
+        return 0;
+    }
+
+    int before = hitPoints;
+    hitPoints = std::min(maxHitPoints, hitPoints + amount);
+    return hitPoints - before;
 }

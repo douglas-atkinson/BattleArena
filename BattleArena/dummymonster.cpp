@@ -47,3 +47,7 @@ bool DummyMonster::move(const WorldState& world) {
 std::string DummyMonster::speak() const {
 	return "I'm not a dummy";
 }
+
+std::string DummyMonster::getTypeName() const {
+	return "DummyMonster";
+}

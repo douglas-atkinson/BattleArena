@@ -1,23 +1,37 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 #include "hero.h"
 #include "monster.h"
 #include "worldstate.h"
+#include "arenatypes.h"
 
+// The game controller: accepts player commands, resolves complete rounds, and reports
+// state through value snapshots and messages. It performs no console input or output.
 class Arena {
 private:
     Hero hero;
     std::vector<std::unique_ptr<Monster>> monsters;
     int rows;
     int cols;
+    int roundsCompleted = 0;
 
 public:
     Arena(Hero hero, std::vector<std::unique_ptr<Monster>> monsters,
         int rows, int cols);
 
-    void runBattle();
+    // A value-based copy of the current state. Monster IDs are 1..N in insertion order.
+    ArenaSnapshot getSnapshot() const;
+
+    // Checks a player command against the current state without executing it.
+    // Changes nothing: no movement, turn, attack, healing, or random numbers.
+    CommandPreview previewCommand(const std::string& command) const;
+
+    // Validates the command and, if it is legal, resolves one complete round.
+    // A rejected command changes nothing and returns an explanation.
+    TurnResult submitCommand(const std::string& command);
 
 private:
     WorldState buildWorldStateForHero() const;
@@ -25,14 +39,20 @@ private:
 
     bool isBattleOver() const;
     bool heroWon() const;
+    bool hasLivingMonsters() const;
+    bool canHeroFight() const;
 
-    void processHeroTurn();
-    void processMonsterTurn(Monster& monster);
+    std::string describeValidation(const MovementValidation& validation,
+        const std::string& command) const;
 
-    Monster* findAdjacentMonsterToHero();
+    // The healing opportunity the hero's action earned, if the round stays peaceful.
+    enum class RecoveryChance { None, Moved, Rested };
 
-    void removeDeadMonsters();
-    void printBattleState() const;
+    bool processHeroAttack(std::vector<std::string>& messages);
+    bool processMonsterTurn(Monster& monster, std::vector<std::string>& messages);
+    void tryHeroRecovery(RecoveryChance recovery, std::vector<std::string>& messages);
+
+    Monster* findAdjacentMonsterToHero() const;
 
     void assignSymbols();
 
@@ -43,7 +63,4 @@ private:
     void validateMonsterPositions() const;
     void validateNoOverlappingCombatants() const;
     bool inBounds(int row, int col) const;
-
-	void displayBattleField() const;
-	void displayBattleFieldLegend() const;
 };

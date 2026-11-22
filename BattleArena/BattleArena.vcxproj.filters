@@ -45,7 +45,25 @@
     <ClInclude Include="arena.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="arenatypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="movementresult.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="goblin.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ogre.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="skeleton.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="bat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="battlefactory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -75,6 +93,21 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="goblin.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ogre.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="skeleton.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="bat.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="battlefactory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

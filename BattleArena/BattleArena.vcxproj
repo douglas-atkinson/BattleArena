@@ -76,6 +76,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -90,6 +91,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -117,6 +119,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -125,26 +128,37 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="arena.h" />
+    <ClInclude Include="arenatypes.h" />
     <ClInclude Include="attackresult.h" />
+    <ClInclude Include="bat.h" />
+    <ClInclude Include="battlefactory.h" />
     <ClInclude Include="combatant.h" />
     <ClInclude Include="dummymonster.h" />
+    <ClInclude Include="goblin.h" />
     <ClInclude Include="hero.h" />
     <ClInclude Include="herotitle.h" />
     <ClInclude Include="monster.h" />
     <ClInclude Include="movementresult.h" />
+    <ClInclude Include="ogre.h" />
     <ClInclude Include="position.h" />
     <ClInclude Include="random.h" />
+    <ClInclude Include="skeleton.h" />
     <ClInclude Include="worldstate.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="arena.cpp" />
+    <ClCompile Include="bat.cpp" />
+    <ClCompile Include="battlefactory.cpp" />
     <ClCompile Include="combatant.cpp" />
     <ClCompile Include="dummymonster.cpp" />
+    <ClCompile Include="goblin.cpp" />
     <ClCompile Include="hero.cpp" />
     <ClCompile Include="herotitle.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="monster.cpp" />
+    <ClCompile Include="ogre.cpp" />
     <ClCompile Include="random.cpp" />
+    <ClCompile Include="skeleton.cpp" />
     <ClCompile Include="worldstate.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
