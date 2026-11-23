@@ -14,6 +14,7 @@
 // Visual test mode (labelled on screen as "VISUAL TEST", never the live game; turns are disabled):
 //   --test-grid <cols>x<rows> show the characters on another grid size (positions rescaled)
 //   --test-log <n>            add n placeholder log lines to exercise the log scrollbar
+//   --test-defeat <seconds>   inspect a defeat cutscene or plaque frame without playing a battle
 
 #include "Layout.hpp"
 #include "LogScroll.hpp"
@@ -191,6 +192,7 @@ int main(int argc, char** argv)
     std::optional<std::string> screenshotPath;
     std::optional<layout::Grid> testGrid;
     int testLogLines = 0;
+    std::optional<float> testDefeatSeconds;
     std::string initialCommand;
     UiState ui;
     for (int i = 1; i < argc; ++i)
@@ -215,6 +217,16 @@ int main(int argc, char** argv)
         }
         else if (arg == "--test-log" && i + 1 < argc)
             testLogLines = std::max(0, std::stoi(argv[++i]));
+        else if (arg == "--test-defeat" && i + 1 < argc)
+        {
+            const float seconds = std::stof(argv[++i]);
+            if (!std::isfinite(seconds) || seconds < 0.f)
+            {
+                std::cerr << "--test-defeat requires a nonnegative number of seconds.\n";
+                return 2;
+            }
+            testDefeatSeconds = seconds;
+        }
         else if (arg == "--test-grid" && i + 1 < argc)
         {
             const std::string text = argv[++i];
@@ -259,6 +271,18 @@ int main(int argc, char** argv)
         for (int n = 1; n <= testLogLines; ++n)
             state.log.push_back({state.round, "Placeholder log line " + std::to_string(n) + ".", LogKind::Info});
         state.visualTest += (state.visualTest.empty() ? "" : ", ") + std::to_string(testLogLines) + " placeholder log lines";
+    }
+
+    if (testDefeatSeconds)
+    {
+        // Presentation-only test: the real Arena and its state are not changed.
+        state.battleOver = true;
+        state.heroWon = false;
+        state.characters.front().hp = 0;
+        state.characters.front().alive = false;
+        state.characters.front().onBattlefield = true;
+        state.visualTest += (state.visualTest.empty() ? "" : ", ") + std::string("defeat cutscene");
+        ui.outcomeElapsedSeconds = *testDefeatSeconds;
     }
 
     Assets assets;
@@ -388,8 +412,8 @@ int main(int argc, char** argv)
             }
         }
 
-        // Animate the plaque once, when the model reports either victory or defeat.
-        if (state.battleOver && !outcomeStarted)
+        // Run the cutscene and/or plaque once after a real battle outcome.
+        if (state.battleOver && !outcomeStarted && !testDefeatSeconds)
         {
             outcomeClock.restart();
             outcomeStarted = true;

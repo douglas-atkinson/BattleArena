@@ -1,5 +1,6 @@
 #include "Renderer.hpp"
 
+#include "DefeatCutscene.hpp"
 #include "Layout.hpp"
 #include "LogScroll.hpp"
 #include "PixelFont.hpp"
@@ -280,7 +281,10 @@ void drawBattlefield(sf::RenderTarget& t, const Assets& a, const ViewState& s, c
         const R tile = grid.tileRect(c.tile);
         if (!c.alive)
         {
-            drawImage(t, a.bonePile, tile.position, layout::artScale, C(200, 196, 186));
+            if (i == 0)
+                defeatcutscene::drawMarker(t, tile.position, layout::artScale);
+            else
+                drawImage(t, a.bonePile, tile.position, layout::artScale, C(200, 196, 186));
             continue;
         }
         const bool flying = c.kind == art::Kind::Bat;
@@ -845,7 +849,15 @@ void drawScene(sf::RenderTarget& target, const Assets& assets, const ViewState& 
     target.clear(pal::background);
     drawTitleBar(target, assets, state);
     drawBattlefield(target, assets, state, ui);
-    drawOutcomePlaque(target, assets, state, ui.outcomeElapsedSeconds);
+    if (state.battleOver && !state.heroWon)
+    {
+        if (ui.outcomeElapsedSeconds < defeatcutscene::duration)
+            defeatcutscene::draw(target, layout::battlefield, ui.outcomeElapsedSeconds);
+        else
+            drawOutcomePlaque(target, assets, state, ui.outcomeElapsedSeconds - defeatcutscene::duration);
+    }
+    else
+        drawOutcomePlaque(target, assets, state, ui.outcomeElapsedSeconds);
     drawHeroPanel(target, assets, state, ui);
     drawRosterPanel(target, assets, state, ui);
     drawLogPanel(target, assets, state, ui);
