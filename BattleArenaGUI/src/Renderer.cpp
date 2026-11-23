@@ -36,6 +36,7 @@ const C gold(196, 150, 80);
 const C goldBright(236, 200, 120);
 const C red(182, 66, 55);
 const C green(108, 157, 98);
+const C yellow(218, 179, 61);
 const C steel(106, 158, 192);
 const C special(222, 128, 60);
 } // namespace pal
@@ -176,6 +177,15 @@ void drawBar(sf::RenderTarget& t, R r, float frac, C fill)
     }
     for (float x = inner.position.x + 8.f; x < inner.position.x + inner.size.x; x += 8.f)
         fillRect(t, {{x, inner.position.y}, {1.f, inner.size.y}}, C(0, 0, 0, 80));
+}
+
+// One color policy for every health bar. Values outside the expected range are
+// clamped by drawBar; invalid maximum HP is treated as an empty bar.
+void drawHealthBar(sf::RenderTarget& t, R r, int hp, int maxHp)
+{
+    const float fraction = maxHp > 0 ? static_cast<float>(hp) / static_cast<float>(maxHp) : 0.f;
+    const C fill = fraction <= 0.25f ? pal::red : (fraction <= 0.75f ? pal::yellow : pal::green);
+    drawBar(t, r, fraction, fill);
 }
 
 void drawDiamond(sf::RenderTarget& t, V center, float px, C color)
@@ -455,7 +465,7 @@ void drawHeroPanel(sf::RenderTarget& t, const Assets& a, const ViewState& s, con
     drawText(t, a.font, hero.name + " the " + s.heroTitle, {x, r.position.y + 36.f}, 22, C(244, 232, 204));
 
     const R bar{{x, r.position.y + 70.f}, {266.f, 18.f}};
-    drawBar(t, bar, static_cast<float>(hero.hp) / static_cast<float>(hero.maxHp), pal::red);
+    drawHealthBar(t, bar, hero.hp, hero.maxHp);
     drawText(t, a.font, std::to_string(hero.hp) + " / " + std::to_string(hero.maxHp) + " HP",
              {bar.position.x + bar.size.x + 12.f, bar.position.y - 3.f}, 19, pal::text);
 
@@ -500,7 +510,7 @@ void drawRosterPanel(sf::RenderTarget& t, const Assets& a, const ViewState& s, c
                  dead ? pal::textFaint : lighten(c.accent, 10));
 
         const R bar{{row.position.x + 224.f, row.position.y + 10.f}, {114.f, 12.f}};
-        drawBar(t, bar, static_cast<float>(c.hp) / static_cast<float>(c.maxHp), dead ? C(70, 60, 56) : pal::red);
+        drawHealthBar(t, bar, c.hp, c.maxHp);
         if (dead)
             pixelfont::draw(t, "SLAIN", {row.position.x + 350.f, row.position.y + 9.f},
                             {2.f, C(214, 90, 74), pal::red, true});
@@ -728,7 +738,7 @@ void drawCard(sf::RenderTarget& t, const Assets& a, const ViewState& s, const Ui
 
     drawText(t, a.font, "HP", {x, r.position.y + 78.f}, 14, pal::textDim);
     const R bar{{x + 26.f, r.position.y + 80.f}, {r.position.x + r.size.x - 14.f - (x + 26.f), 14.f}};
-    drawBar(t, bar, static_cast<float>(c.hp) / static_cast<float>(c.maxHp), pal::red);
+    drawHealthBar(t, bar, c.hp, c.maxHp);
     drawText(t, a.font, std::to_string(c.hp) + " / " + std::to_string(c.maxHp), {x, r.position.y + 98.f}, 19,
              dead ? pal::textFaint : pal::text);
 
