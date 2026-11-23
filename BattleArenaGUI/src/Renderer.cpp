@@ -1,6 +1,7 @@
 #include "Renderer.hpp"
 
 #include "DefeatCutscene.hpp"
+#include "VictoryCutscene.hpp"
 #include "Layout.hpp"
 #include "LogScroll.hpp"
 #include "PixelFont.hpp"
@@ -849,7 +850,14 @@ void drawScene(sf::RenderTarget& target, const Assets& assets, const ViewState& 
     target.clear(pal::background);
     drawTitleBar(target, assets, state);
     drawBattlefield(target, assets, state, ui);
-    if (state.battleOver && !state.heroWon)
+    if (state.battleOver && state.heroWon)
+    {
+        if (ui.outcomeElapsedSeconds < victorycutscene::duration)
+            victorycutscene::draw(target, layout::battlefield, ui.outcomeElapsedSeconds);
+        else
+            drawOutcomePlaque(target, assets, state, ui.outcomeElapsedSeconds - victorycutscene::duration);
+    }
+    else if (state.battleOver && !state.heroWon)
     {
         if (ui.outcomeElapsedSeconds < defeatcutscene::duration)
             defeatcutscene::draw(target, layout::battlefield, ui.outcomeElapsedSeconds);
