@@ -19,9 +19,6 @@ AttackResult Ogre::attack(Combatant& target) {
 		result.messages.push_back(name + " swings its club.");
 	}
 	else if (result.hit) {
-		result.messages.push_back(name + " let's out a blood-curdling scream that "
-			"resonates throughout the entire Kingdom. His upper lip curlus up to show "
-			"his ancient, sharp teeth. Don't go anywhere, little man.");
 		result.messages.push_back(name + " winds up a crushing smash...");
 		result.messages.push_back("The smash lands with bone-rattling force!");
 	}
