@@ -16,6 +16,7 @@
 //   --test-log <n>            add n placeholder log lines to exercise the log scrollbar
 //   --test-defeat <seconds>   inspect a defeat cutscene or plaque frame without playing a battle
 
+#include "CombatLogExport.hpp"
 #include "Layout.hpp"
 #include "LogScroll.hpp"
 #include "Renderer.hpp"
@@ -318,6 +319,9 @@ int main(int argc, char** argv)
 
     float wheelRemainder = 0.f;
     bool enterHeld = false;
+    bool f8Held = false;
+    sf::Clock exportNoticeClock;
+    bool exportNoticeActive = false;
     sf::Clock outcomeClock;
     bool outcomeStarted = false;
     while (window.isOpen())
@@ -330,7 +334,20 @@ int main(int argc, char** argv)
                 window.setView(makeView(resized->size));
             else if (const auto* key = event->getIf<sf::Event::KeyPressed>())
             {
-                if (key->code == sf::Keyboard::Key::Enter)
+                if (key->code == sf::Keyboard::Key::F8)
+                {
+                    // Export only once per physical key press, including after battle over.
+                    if (!f8Held)
+                    {
+                        const logexport::Result result = logexport::save(state.log);
+                        ui.logExportNotice = result.message;
+                        ui.logExportSucceeded = result.success;
+                        exportNoticeClock.restart();
+                        exportNoticeActive = true;
+                    }
+                    f8Held = true;
+                }
+                else if (key->code == sf::Keyboard::Key::Enter)
                 {
                     // One submission per physical press: key-repeat events are ignored.
                     if (!enterHeld)
@@ -348,6 +365,8 @@ int main(int argc, char** argv)
             {
                 if (keyUp->code == sf::Keyboard::Key::Enter)
                     enterHeld = false;
+                else if (keyUp->code == sf::Keyboard::Key::F8)
+                    f8Held = false;
             }
             else if (const auto* moved = event->getIf<sf::Event::MouseMoved>())
             {
@@ -368,6 +387,7 @@ int main(int argc, char** argv)
             {
                 ui.draggingLogThumb = false;
                 enterHeld = false;
+                f8Held = false;
             }
             else if (const auto* click = event->getIf<sf::Event::MouseButtonPressed>())
             {
@@ -420,6 +440,11 @@ int main(int argc, char** argv)
         }
         if (outcomeStarted)
             ui.outcomeElapsedSeconds = outcomeClock.getElapsedTime().asSeconds();
+        if (exportNoticeActive && exportNoticeClock.getElapsedTime().asSeconds() >= 5.f)
+        {
+            ui.logExportNotice.clear();
+            exportNoticeActive = false;
+        }
 
         drawScene(window, assets, state, ui);
         window.display();

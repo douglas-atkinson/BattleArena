@@ -771,9 +771,12 @@ void drawPortraitHud(sf::RenderTarget& t, const Assets& a, const ViewState& s, c
         drawCard(t, a, s, ui, i);
 }
 
-void drawStatusLine(sf::RenderTarget& t, const Assets& a, const ViewState& s)
+void drawStatusLine(sf::RenderTarget& t, const Assets& a, const ViewState& s, const UiState& ui)
 {
-    if (s.battleOver)
+    if (!ui.logExportNotice.empty())
+        drawText(t, a.font, ui.logExportNotice, {24.f, layout::statusLineY}, 14,
+                 ui.logExportSucceeded ? lighten(pal::green, 25) : lighten(pal::red, 30), false);
+    else if (s.battleOver)
         drawText(t, a.font, s.heroWon ? "VICTORY  -  every monster is defeated" : "DEFEAT  -  the hero has fallen",
                  {24.f, layout::statusLineY}, 14, s.heroWon ? pal::goldBright : lighten(pal::red, 30), false);
     else if (s.visualTest.empty())
@@ -782,7 +785,7 @@ void drawStatusLine(sf::RenderTarget& t, const Assets& a, const ViewState& s)
     else
         drawText(t, a.font, "VISUAL TEST  -  " + s.visualTest + "  -  not the live Arena",
                  {24.f, layout::statusLineY}, 14, pal::gold, false);
-    const std::string right = "Hover to highlight  |  Click to inspect  |  Wheel scrolls the log  |  W A S D R F  Enter  Backspace  Esc";
+    const std::string right = "F8 Save log  |  Hover to highlight  |  Click to inspect  |  Wheel scrolls log  |  W A S D R F  Enter  Backspace  Esc";
     drawText(t, a.font, right, {1576.f - textWidth(a.font, right, 14), layout::statusLineY}, 14, pal::textFaint, false);
 }
 } // namespace
@@ -871,7 +874,7 @@ void drawScene(sf::RenderTarget& target, const Assets& assets, const ViewState& 
     drawLogPanel(target, assets, state, ui);
     drawCommandBar(target, assets, state, ui);
     drawPortraitHud(target, assets, state, ui);
-    drawStatusLine(target, assets, state);
+    drawStatusLine(target, assets, state, ui);
 }
 
 std::optional<sf::Vector2i> tileAt(sf::Vector2f p, const ViewState& state)

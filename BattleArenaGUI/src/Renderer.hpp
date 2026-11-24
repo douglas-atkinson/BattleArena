@@ -52,6 +52,8 @@ struct UiState
     std::vector<loglayout::Row> logRows;    // cached wrapped rows, built after log changes
     bool draggingLogThumb = false;          // left button held on the log scrollbar thumb
     float logThumbGrabOffset = 0.f;         // mouse y minus thumb top when the drag began
+    std::string logExportNotice;            // temporary status message after pressing F8
+    bool logExportSucceeded = false;
     float outcomeElapsedSeconds = 2.4f;    // fully visible for static views; timed in live play
 };
 
